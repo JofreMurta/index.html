@@ -2,10 +2,11 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>3.BPRv - Livro de Passagem Eletrônico</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3.BPRv - Consulta e Registro de Passagem</title>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCNrhC9tfS-qzEnj22mAA0VMULeP3abk70",
@@ -19,8 +20,15 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        window.addRow = (containerId, nome="", pol="", obs="") => {
-            const container = document.getElementById(containerId);
+        // Função para preencher a data e hora atual no carregamento
+        window.onload = () => {
+            const agora = new Date();
+            agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
+            document.getElementById('data-consulta').value = agora.toISOString().slice(0, 16);
+        };
+
+        window.addRow = (nome="", pol="", obs="") => {
+            const container = document.getElementById('lista-materiais');
             const div = document.createElement('div');
             div.className = 'row-item no-print';
             div.innerHTML = `
@@ -32,13 +40,42 @@
             container.appendChild(div);
         };
 
+        // CONSULTA: Busca relatório por data próxima à escolhida
+        window.consultarRelatorio = async () => {
+            const dataEscolha = new Date(document.getElementById('data-consulta').value);
+            const q = query(
+                collection(db, "passagens"), 
+                where("timestamp", "<=", dataEscolha),
+                orderBy("timestamp", "desc"),
+                limit(1)
+            );
+
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const reg = querySnapshot.docs[0].data();
+                document.getElementById('pol-sai').value = reg.polSaindo;
+                document.getElementById('pol-entra').value = reg.polEntrando;
+                document.getElementById('turno').value = reg.turno;
+                document.getElementById('ppri').value = reg.ppri;
+                document.getElementById('sicoordop').value = reg.sicoordop;
+                document.getElementById('protocolo').value = reg.protocolo;
+                document.getElementById('livre-atendente').value = reg.livreAtendente;
+                
+                document.getElementById('lista-materiais').innerHTML = "";
+                reg.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
+                alert("Relatório da data selecionada carregado com sucesso!");
+            } else {
+                alert("Nenhum registro encontrado para esta data.");
+            }
+        };
+
+        // SALVAR: Grava com a data do calendário
         window.salvarRegistro = async () => {
             const btn = document.getElementById('btnSalvar');
             btn.disabled = true;
-            btn.innerText = "Gravando...";
-
+            
             const registro = {
-                timestamp: new Date(),
+                timestamp: new Date(document.getElementById('data-consulta').value),
                 polSaindo: document.getElementById('pol-sai').value,
                 polEntrando: document.getElementById('pol-entra').value,
                 turno: document.getElementById('turno').value,
@@ -55,61 +92,41 @@
 
             try {
                 await addDoc(collection(db, "passagens"), registro);
-                alert("Serviço registrado com sucesso! Os dados permanecem na tela para a próxima equipe.");
+                alert("Passagem gravada na nuvem com sucesso para a data selecionada!");
                 btn.disabled = false;
-                btn.innerText = "FINALIZAR E GRAVAR NOVA PASSAGEM";
             } catch (e) {
-                alert("Erro ao gravar: " + e);
+                alert("Erro: " + e);
                 btn.disabled = false;
             }
         };
-
-        const q = query(collection(db, "passagens"), orderBy("timestamp", "desc"));
-        onSnapshot(q, (snapshot) => {
-            const container = document.getElementById('historico');
-            container.innerHTML = "<h2 class='no-print'>Histórico de Passagens</h2>";
-            snapshot.forEach((doc) => {
-                const reg = doc.data();
-                const div = document.createElement('div');
-                div.className = 'card-historico no-print';
-                div.innerHTML = `
-                    <strong>${reg.timestamp.toDate().toLocaleString()}</strong> - Turno: ${reg.turno}<br>
-                    De: ${reg.polSaindo} Para: ${reg.polEntrando}
-                `;
-                container.appendChild(div);
-            });
-        });
     </script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1, h2 { color: #1a365d; border-bottom: 2px solid #1a365d; padding-bottom: 5px; }
+        .seletor-data { background: #1a365d; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; }
+        .seletor-data input { width: auto; padding: 8px; border-radius: 4px; border: none; }
+        h1, h2 { color: #1a365d; border-bottom: 2px solid #1a365d; }
         .row-item { display: grid; grid-template-columns: 1fr 1fr 2fr 40px; gap: 5px; margin-bottom: 5px; }
-        textarea { width: 100%; border: 1px solid #ccc; border-radius: 4px; padding: 10px; font-family: inherit; }
-        .btn-add { background: #1a365d; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; }
-        .btn-del { background: #dc3545; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        textarea { width: 100%; border: 1px solid #ccc; padding: 10px; border-radius: 4px; }
+        .btn-consultar { background: #ffc107; color: #000; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; }
         .btn-save { background: #28a745; color: white; width: 100%; padding: 15px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; }
         .btn-print { background: #6c757d; color: white; width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
-        .card-historico { background: #fff; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-left: 5px solid #1a365d; }
-        
-        /* Estilo para Impressão PDF */
-        @media print {
-            .no-print { display: none !important; }
-            body { background: white; padding: 0; }
-            .container { box-shadow: none; max-width: 100%; width: 100%; border: none; }
-            textarea { border: none; height: auto; overflow: visible; font-size: 12pt; }
-            h1 { font-size: 18pt; text-align: center; }
-            .print-only { display: block; margin-bottom: 20px; border-bottom: 1px solid black; }
-        }
+        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
-    <div class="container" id="printable">
-        <h1>3.BPRv - Livro de Passagem de Serviço</h1>
+    <div class="container">
+        <div class="seletor-data no-print">
+            <strong>DATA E HORA DO SERVIÇO:</strong>
+            <input type="datetime-local" id="data-consulta">
+            <button class="btn-consultar" onclick="consultarRelatorio()">BUSCAR RELATÓRIO ANTERIOR</button>
+        </div>
+
+        <h1>3.BPRv - Passagem de Serviço</h1>
         
         <div style="display:flex; gap:10px; margin-bottom:20px;">
-            <div style="flex:1;"><label>De (Saindo):</label><input type="text" id="pol-sai" placeholder="Ex: Cb PM Nielsen"></div>
-            <div style="flex:1;"><label>Para (Entrando):</label><input type="text" id="pol-entra" placeholder="Ex: Cb PM Daniel Silva"></div>
+            <div style="flex:1;"><label>De (Saindo):</label><input type="text" id="pol-sai"></div>
+            <div style="flex:1;"><label>Para (Entrando):</label><input type="text" id="pol-entra"></div>
             <div><label>Turno:</label>
                 <select id="turno">
                     <option>06h00 às 18h00</option>
@@ -118,26 +135,17 @@
             </div>
         </div>
 
-        <h2>1. PPRI</h2>
-        <textarea id="ppri" rows="10"></textarea>
-
-        <h2>2. SICOORDOP</h2>
-        <textarea id="sicoordop" rows="5"></textarea>
-
+        <h2>1. PPRI</h2><textarea id="ppri" rows="8"></textarea>
+        <h2>2. SICOORDOP</h2><textarea id="sicoordop" rows="5"></textarea>
         <h2>3. VIATURAS / MATERIAIS</h2>
         <div id="lista-materiais"></div>
-        <button type="button" class="btn-add no-print" onclick="addRow('lista-materiais')">+ Adicionar Item</button>
+        <button type="button" class="no-print" onclick="addRow()">+ Adicionar Item</button>
 
-        <h2>4. PROTOCOLO</h2>
-        <textarea id="protocolo" rows="5"></textarea>
+        <h2>4. PROTOCOLO</h2><textarea id="protocolo" rows="5"></textarea>
+        <h2>5. LIVRE ATENDENTE</h2><textarea id="livre-atendente" rows="15"></textarea>
 
-        <h2>5. LIVRE ATENDENTE</h2>
-        <textarea id="livre-atendente" rows="20"></textarea>
-
-        <button id="btnSalvar" class="btn-save no-print" onclick="salvarRegistro()">FINALIZAR E GRAVAR PASSAGEM</button>
-        <button class="btn-print no-print" onclick="window.print()">GERAR PDF / IMPRIMIR RELATÓRIO</button>
-
-        <div id="historico" class="no-print"></div>
+        <button id="btnSalvar" class="btn-save no-print" onclick="salvarRegistro()">GRAVAR NESTA DATA</button>
+        <button class="btn-print no-print" onclick="window.print()">GERAR PDF</button>
     </div>
 </body>
 </html>
