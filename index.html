@@ -21,9 +21,8 @@
         const db = getFirestore(app);
 
         window.onload = () => {
-            const agora = new Date();
-            agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
-            document.getElementById('data-consulta').value = agora.toISOString().slice(0, 16);
+            const hoje = new Date().toISOString().split('T')[0];
+            document.getElementById('data-busca').value = hoje;
         };
 
         window.addRow = (nome="", pol="", obs="") => {
@@ -41,8 +40,11 @@
         };
 
         window.consultarRelatorio = async () => {
-            const dataEscolha = new Date(document.getElementById('data-consulta').value);
-            const q = query(collection(db, "passagens"), where("timestamp", "<=", dataEscolha), orderBy("timestamp", "desc"), limit(1));
+            const dataPura = document.getElementById('data-busca').value;
+            const horaPura = document.getElementById('hora-busca').value;
+            const dataBusca = new Date(`${dataPura}T${horaPura}:00`);
+
+            const q = query(collection(db, "passagens"), where("timestamp", "==", dataBusca), limit(1));
             const querySnapshot = await getDocs(q);
             
             if (!querySnapshot.empty) {
@@ -50,14 +52,14 @@
                 preencherCampos(reg, true);
                 document.getElementById('assinatura-area').innerHTML = `<div class="auth-box"><strong>Assinado eletronicamente por:</strong> ${reg.assinatura}</div>`;
             } else {
-                alert("Nenhum registro encontrado para este horário.");
+                alert("Nenhum registro exato encontrado para esta data e hora. Tente o horário anterior.");
             }
         };
 
         function preencherCampos(reg, bloquear) {
             document.getElementById('pol-sai').value = reg.polSaindo || "";
             document.getElementById('pol-entra').value = reg.polEntrando || "";
-            document.getElementById('turno').value = reg.turno || "";
+            document.getElementById('turno-relatorio').value = reg.turno || "";
             document.getElementById('ppri').value = reg.ppri || "";
             document.getElementById('sicoordop').value = reg.sicoordop || "";
             document.getElementById('protocolo').value = reg.protocolo || "";
@@ -68,7 +70,7 @@
             if(reg.itens) reg.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
 
             const inputs = document.querySelectorAll('input, textarea, select');
-            inputs.forEach(i => { if(i.id !== 'data-consulta') i.readOnly = bloquear; });
+            inputs.forEach(i => { if(i.id !== 'data-busca' && i.id !== 'hora-busca') i.readOnly = bloquear; });
             
             document.getElementById('btnSalvar').style.display = bloquear ? 'none' : 'block';
             document.getElementById('btnNova').style.display = bloquear ? 'block' : 'none';
@@ -79,27 +81,26 @@
             document.getElementById('btnSalvar').style.display = 'block';
             document.getElementById('btnNova').style.display = 'none';
             document.getElementById('assinatura-area').innerHTML = "";
-            
-            const agora = new Date();
-            agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
-            document.getElementById('data-consulta').value = agora.toISOString().slice(0, 16);
-            alert("Modo de edição liberado. Os dados anteriores foram mantidos para sua atualização.");
+            alert("Campos liberados. Atualize os dados para o novo turno e assine.");
         };
 
         window.salvarRegistro = async () => {
-            const nomeAssinatura = prompt("Para confirmar a integridade dos dados, digite seu NOME e RE:");
-            if(!nomeAssinatura) return alert("A assinatura é obrigatória.");
+            const nomeAssinatura = prompt("Digite seu NOME e RE para assinatura eletrônica:");
+            if(!nomeAssinatura) return alert("Assinatura obrigatória.");
+
+            const dataPura = document.getElementById('data-busca').value;
+            const horaPura = document.getElementById('hora-busca').value;
 
             const registro = {
-                timestamp: new Date(document.getElementById('data-consulta').value),
+                timestamp: new Date(`${dataPura}T${horaPura}:00`),
                 polSaindo: document.getElementById('pol-sai').value,
                 polEntrando: document.getElementById('pol-entra').value,
-                turno: document.getElementById('turno').value,
+                turno: document.getElementById('turno-relatorio').value,
                 ppri: document.getElementById('ppri').value,
                 sicoordop: document.getElementById('sicoordop').value,
                 protocolo: document.getElementById('protocolo').value,
                 livreAtendente: document.getElementById('livre-atendente').value,
-                assinatura: `${nomeAssinatura} em ${new Date().toLocaleString('pt-BR')} (Autenticação: ${Math.random().toString(36).substr(2, 9).toUpperCase()})`,
+                assinatura: `${nomeAssinatura} em ${new Date().toLocaleString('pt-BR')}`,
                 itens: Array.from(document.querySelectorAll('.row-item')).map(row => ({
                     nome: row.querySelector('.nome-item').value,
                     pol: row.querySelector('.pol-item').value,
@@ -109,31 +110,30 @@
 
             try {
                 await addDoc(collection(db, "passagens"), registro);
-                alert("Passagem assinada e salva com sucesso!");
-                // Não usamos location.reload() para manter os dados na tela
+                alert("Passagem gravada com sucesso!");
+                preencherCampos(registro, true);
                 document.getElementById('assinatura-area').innerHTML = `<div class="auth-box"><strong>Assinado eletronicamente por:</strong> ${registro.assinatura}</div>`;
-                preencherCampos(registro, true); 
             } catch (e) {
                 alert("Erro ao salvar: " + e);
             }
         };
     </script>
     <style>
-        body { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background: #e9ecef; padding: 20px; color: #333; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #e9ecef; padding: 20px; }
         .container { max-width: 950px; margin: auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
-        .seletor-data { background: #1a365d; color: white; padding: 20px; border-radius: 8px; margin-bottom: 25px; display: flex; gap: 15px; align-items: center; justify-content: center; }
+        .seletor-busca { background: #1a365d; color: white; padding: 20px; border-radius: 8px; margin-bottom: 25px; display: flex; gap: 15px; align-items: center; justify-content: center; }
         h1 { text-align: center; color: #1a365d; border-bottom: 3px solid #1a365d; margin-bottom: 30px; }
-        h2 { background: #f8f9fa; color: #1a365d; padding: 10px; border-left: 5px solid #1a365d; font-size: 1.2em; margin-top: 30px; }
+        h2 { background: #f8f9fa; color: #1a365d; padding: 10px; border-left: 5px solid #1a365d; margin-top: 30px; }
         .row-item { display: grid; grid-template-columns: 1fr 1fr 2fr 45px; gap: 8px; margin-bottom: 10px; }
-        textarea, input, select { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; }
-        .btn-save { background: #28a745; color: white; width: 100%; padding: 18px; font-size: 16px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 30px; }
-        .btn-nova { background: #007bff; color: white; width: 100%; padding: 18px; font-size: 16px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; display: none; margin-top: 30px; }
-        .auth-box { border: 2px dashed #1a365d; padding: 20px; margin-top: 30px; background: #f0f7ff; text-align: center; font-size: 0.95em; }
+        textarea, input, select { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 4px; }
+        .btn-save { background: #28a745; color: white; width: 100%; padding: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; }
+        .btn-nova { background: #007bff; color: white; width: 100%; padding: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; display: none; margin-top: 20px; }
+        .auth-box { border: 2px dashed #1a365d; padding: 20px; margin-top: 25px; background: #f0f7ff; text-align: center; font-style: italic; }
         .print-only { display: none; }
         @media print {
             .no-print { display: none !important; }
-            .print-only { display: block; border-bottom: 1px solid #ddd; padding: 5px 0; }
-            .container { box-shadow: none; width: 100%; max-width: 100%; padding: 0; }
+            .print-only { display: block; margin-bottom: 5px; }
+            .container { box-shadow: none; padding: 0; }
             textarea, input { border: none !important; }
             .row-item input { display: none; }
         }
@@ -141,25 +141,35 @@
 </head>
 <body>
     <div class="container">
-        <div class="seletor-data no-print">
-            <strong>CONSULTAR DATA/HORA:</strong>
-            <input type="datetime-local" id="data-consulta">
-            <button onclick="consultarRelatorio()" style="cursor:pointer; padding: 10px 20px; font-weight:bold;">BUSCAR</button>
+        <div class="seletor-busca no-print">
+            <strong>DATA:</strong>
+            <input type="date" id="data-busca" style="width: auto;">
+            <strong>HORÁRIO:</strong>
+            <select id="hora-busca" style="width: auto;">
+                <option value="06:00">06:00</option>
+                <option value="18:00">18:00</option>
+            </select>
+            <button onclick="consultarRelatorio()" style="cursor:pointer; padding: 10px 20px; font-weight:bold; background:#ffc107; border:none; border-radius:4px;">BUSCAR</button>
         </div>
 
-        <h1>3.BPRv - Livro de Passagem de Serviço</h1>
+        <h1>3.BPRv - Passagem de Serviço</h1>
         
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:20px;">
             <div><label>Policial Saindo:</label><input type="text" id="pol-sai"></div>
             <div><label>Policial Entrando:</label><input type="text" id="pol-entra"></div>
-            <div><label>Turno:</label><select id="turno"><option>06h00 às 18h00</option><option>18h00 às 06h00</option></select></div>
+            <div><label>Turno:</label>
+                <select id="turno-relatorio">
+                    <option>06h00 às 18h00</option>
+                    <option>18h00 às 06h00</option>
+                </select>
+            </div>
         </div>
 
         <h2>1. PPRI (Ordens e Instruções)</h2><textarea id="ppri" rows="8"></textarea>
-        <h2>2. SICOORDOP (Ocorrências de Vulto)</h2><textarea id="sicoordop" rows="5"></textarea>
+        <h2>2. SICOORDOP</h2><textarea id="sicoordop" rows="5"></textarea>
         <h2>3. VIATURAS E MATERIAIS</h2>
         <div id="lista-materiais"></div>
-        <button type="button" class="no-print" onclick="addRow()" style="margin-top:10px; padding:8px; cursor:pointer;">+ Adicionar Viatura/Material</button>
+        <button type="button" class="no-print" onclick="addRow()" style="margin-top:10px; cursor:pointer; padding:5px;">+ Adicionar Item</button>
 
         <h2>4. PROTOCOLO</h2><textarea id="protocolo" rows="5"></textarea>
         <h2>5. LIVRE ATENDENTE</h2><textarea id="livre-atendente" rows="20"></textarea>
@@ -168,7 +178,7 @@
 
         <button id="btnSalvar" class="btn-save no-print" onclick="salvarRegistro()">ASSINAR E REGISTRAR PASSAGEM</button>
         <button id="btnNova" class="btn-nova no-print" onclick="prepararNova()">EFETUAR NOVA PASSAGEM (BASEADA NESTA)</button>
-        <button class="no-print" style="width:100%; margin-top:15px; padding:12px; background:#6c757d; color:white; border:none; border-radius:6px; cursor:pointer;" onclick="window.print()">GERAR PDF PARA ARQUIVO</button>
+        <button class="no-print" style="width:100%; margin-top:10px; padding:12px; background:#6c757d; color:white; border:none; cursor:pointer;" onclick="window.print()">GERAR PDF</button>
     </div>
 </body>
 </html>
