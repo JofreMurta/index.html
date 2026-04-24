@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3.BPRv - Consulta e Registro de Passagem</title>
+    <title>3.BPRv - Livro de Passagem Eletrônico</title>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCNrhC9tfS-qzEnj22mAA0VMULeP3abk70",
@@ -20,7 +20,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Função para preencher a data e hora atual no carregamento
         window.onload = () => {
             const agora = new Date();
             agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
@@ -30,50 +29,63 @@
         window.addRow = (nome="", pol="", obs="") => {
             const container = document.getElementById('lista-materiais');
             const div = document.createElement('div');
-            div.className = 'row-item no-print';
+            div.className = 'row-item';
             div.innerHTML = `
                 <input type="text" value="${nome}" placeholder="Item" class="nome-item">
                 <input type="text" value="${pol}" placeholder="Policial" class="pol-item">
                 <input type="text" value="${obs}" placeholder="Obs" class="obs-item">
-                <button type="button" class="btn-del" onclick="this.parentElement.remove()">X</button>
+                <button type="button" class="btn-del no-print" onclick="this.parentElement.remove()">X</button>
+                <span class="print-only">${nome} | ${pol} | ${obs}</span>
             `;
             container.appendChild(div);
         };
 
-        // CONSULTA: Busca relatório por data próxima à escolhida
         window.consultarRelatorio = async () => {
             const dataEscolha = new Date(document.getElementById('data-consulta').value);
-            const q = query(
-                collection(db, "passagens"), 
-                where("timestamp", "<=", dataEscolha),
-                orderBy("timestamp", "desc"),
-                limit(1)
-            );
-
+            const q = query(collection(db, "passagens"), where("timestamp", "<=", dataEscolha), orderBy("timestamp", "desc"), limit(1));
             const querySnapshot = await getDocs(q);
+            
             if (!querySnapshot.empty) {
                 const reg = querySnapshot.docs[0].data();
-                document.getElementById('pol-sai').value = reg.polSaindo;
-                document.getElementById('pol-entra').value = reg.polEntrando;
-                document.getElementById('turno').value = reg.turno;
-                document.getElementById('ppri').value = reg.ppri;
-                document.getElementById('sicoordop').value = reg.sicoordop;
-                document.getElementById('protocolo').value = reg.protocolo;
-                document.getElementById('livre-atendente').value = reg.livreAtendente;
-                
-                document.getElementById('lista-materiais').innerHTML = "";
-                reg.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
-                alert("Relatório da data selecionada carregado com sucesso!");
+                preencherCampos(reg, true); // true = Bloqueia edição
+                document.getElementById('assinatura-area').innerHTML = `<div class="auth-box">Assinado eletronicamente por: ${reg.assinatura || 'N/A'}</div>`;
             } else {
-                alert("Nenhum registro encontrado para esta data.");
+                alert("Nenhum registro encontrado.");
             }
         };
 
-        // SALVAR: Grava com a data do calendário
+        function preencherCampos(reg, bloquear) {
+            document.getElementById('pol-sai').value = reg.polSaindo;
+            document.getElementById('pol-entra').value = reg.polEntrando;
+            document.getElementById('turno').value = reg.turno;
+            document.getElementById('ppri').value = reg.ppri;
+            document.getElementById('sicoordop').value = reg.sicoordop;
+            document.getElementById('protocolo').value = reg.protocolo;
+            document.getElementById('livre-atendente').value = reg.livreAtendente;
+            document.getElementById('lista-materiais').innerHTML = "";
+            reg.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
+
+            const inputs = document.querySelectorAll('input, textarea, select');
+            inputs.forEach(i => { if(i.id !== 'data-consulta') i.readOnly = bloquear; });
+            document.getElementById('btnSalvar').style.display = bloquear ? 'none' : 'block';
+            document.getElementById('btnNova').style.display = bloquear ? 'block' : 'none';
+        }
+
+        window.prepararNova = () => {
+            document.querySelectorAll('input, textarea, select').forEach(i => i.readOnly = false);
+            document.getElementById('btnSalvar').style.display = 'block';
+            document.getElementById('btnNova').style.display = 'none';
+            document.getElementById('assinatura-area').innerHTML = "";
+            const agora = new Date();
+            agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
+            document.getElementById('data-consulta').value = agora.toISOString().slice(0, 16);
+            alert("Campos liberados. Atualize os dados e clique em Gravar para gerar um NOVO registro.");
+        };
+
         window.salvarRegistro = async () => {
-            const btn = document.getElementById('btnSalvar');
-            btn.disabled = true;
-            
+            const nomeAssinatura = prompt("Para assinar, digite seu NOME e RE:");
+            if(!nomeAssinatura) return alert("Assinatura obrigatória para gravar.");
+
             const registro = {
                 timestamp: new Date(document.getElementById('data-consulta').value),
                 polSaindo: document.getElementById('pol-sai').value,
@@ -83,6 +95,7 @@
                 sicoordop: document.getElementById('sicoordop').value,
                 protocolo: document.getElementById('protocolo').value,
                 livreAtendente: document.getElementById('livre-atendente').value,
+                assinatura: `${nomeAssinatura} em ${new Date().toLocaleString()} (Cód: ${Math.random().toString(36).substr(2, 9).toUpperCase()})`,
                 itens: Array.from(document.querySelectorAll('.row-item')).map(row => ({
                     nome: row.querySelector('.nome-item').value,
                     pol: row.querySelector('.pol-item').value,
@@ -90,62 +103,63 @@
                 }))
             };
 
-            try {
-                await addDoc(collection(db, "passagens"), registro);
-                alert("Passagem gravada na nuvem com sucesso para a data selecionada!");
-                btn.disabled = false;
-            } catch (e) {
-                alert("Erro: " + e);
-                btn.disabled = false;
-            }
+            await addDoc(collection(db, "passagens"), registro);
+            alert("Passagem gravada e assinada!");
+            location.reload();
         };
     </script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
+        body { font-family: 'Segoe UI', Arial; background: #f0f2f5; padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .seletor-data { background: #1a365d; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; }
-        .seletor-data input { width: auto; padding: 8px; border-radius: 4px; border: none; }
-        h1, h2 { color: #1a365d; border-bottom: 2px solid #1a365d; }
+        .no-print { display: block; }
+        .print-only { display: none; }
+        .seletor-data { background: #1a365d; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+        h1, h2 { color: #1a365d; border-bottom: 2px solid #1a365d; margin-top: 20px; }
         .row-item { display: grid; grid-template-columns: 1fr 1fr 2fr 40px; gap: 5px; margin-bottom: 5px; }
-        textarea { width: 100%; border: 1px solid #ccc; padding: 10px; border-radius: 4px; }
-        .btn-consultar { background: #ffc107; color: #000; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        .btn-save { background: #28a745; color: white; width: 100%; padding: 15px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; }
-        .btn-print { background: #6c757d; color: white; width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
-        @media print { .no-print { display: none !important; } }
+        textarea, input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn-save { background: #28a745; color: white; width: 100%; padding: 15px; font-weight: bold; border: none; margin-top: 20px; cursor: pointer; }
+        .btn-nova { background: #007bff; color: white; width: 100%; padding: 15px; font-weight: bold; border: none; margin-top: 20px; cursor: pointer; display: none; }
+        .auth-box { border: 2px solid #1a365d; padding: 10px; margin-top: 20px; background: #f8f9fa; font-style: italic; }
+        
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block; font-size: 11pt; margin-bottom: 10px; }
+            input, textarea { border: none !important; outline: none !important; resize: none; overflow: visible; }
+            .row-item input { display: none; }
+            .container { box-shadow: none; width: 100%; max-width: 100%; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="seletor-data no-print">
-            <strong>DATA E HORA DO SERVIÇO:</strong>
+            <strong>DATA/HORA DO SERVIÇO:</strong>
             <input type="datetime-local" id="data-consulta">
-            <button class="btn-consultar" onclick="consultarRelatorio()">BUSCAR RELATÓRIO ANTERIOR</button>
+            <button onclick="consultarRelatorio()" style="cursor:pointer; padding: 8px;">BUSCAR</button>
         </div>
 
         <h1>3.BPRv - Passagem de Serviço</h1>
         
-        <div style="display:flex; gap:10px; margin-bottom:20px;">
-            <div style="flex:1;"><label>De (Saindo):</label><input type="text" id="pol-sai"></div>
-            <div style="flex:1;"><label>Para (Entrando):</label><input type="text" id="pol-entra"></div>
-            <div><label>Turno:</label>
-                <select id="turno">
-                    <option>06h00 às 18h00</option>
-                    <option>18h00 às 06h00</option>
-                </select>
-            </div>
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1;"><label>Saindo:</label><input type="text" id="pol-sai"></div>
+            <div style="flex:1;"><label>Entrando:</label><input type="text" id="pol-entra"></div>
+            <div><label>Turno:</label><select id="turno"><option>06h00 às 18h00</option><option>18h00 às 06h00</option></select></div>
         </div>
 
         <h2>1. PPRI</h2><textarea id="ppri" rows="8"></textarea>
-        <h2>2. SICOORDOP</h2><textarea id="sicoordop" rows="5"></textarea>
+        <h2>2. SICOORDOP</h2><textarea id="sicoordop" rows="4"></textarea>
         <h2>3. VIATURAS / MATERIAIS</h2>
         <div id="lista-materiais"></div>
         <button type="button" class="no-print" onclick="addRow()">+ Adicionar Item</button>
 
-        <h2>4. PROTOCOLO</h2><textarea id="protocolo" rows="5"></textarea>
+        <h2>4. PROTOCOLO</h2><textarea id="protocolo" rows="4"></textarea>
         <h2>5. LIVRE ATENDENTE</h2><textarea id="livre-atendente" rows="15"></textarea>
 
-        <button id="btnSalvar" class="btn-save no-print" onclick="salvarRegistro()">GRAVAR NESTA DATA</button>
-        <button class="btn-print no-print" onclick="window.print()">GERAR PDF</button>
+        <div id="assinatura-area"></div>
+
+        <button id="btnSalvar" class="btn-save no-print" onclick="salvarRegistro()">ASSINAR E GRAVAR NA NUVEM</button>
+        <button id="btnNova" class="btn-nova no-print" onclick="prepararNova()">CRIAR NOVA PASSAGEM BASEADA NESTA</button>
+        <button class="no-print" style="width:100%; margin-top:10px; padding:10px;" onclick="window.print()">GERAR PDF / IMPRIMIR</button>
     </div>
 </body>
 </html>
