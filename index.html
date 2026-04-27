@@ -30,11 +30,22 @@
             const div = document.createElement('div');
             div.className = 'row-item';
             div.innerHTML = `
-                <input type="text" value="${nome}" placeholder="Item" class="nome-item">
-                <input type="text" value="${pol}" placeholder="Policial" class="pol-item">
-                <input type="text" value="${obs}" placeholder="Obs" class="obs-item">
-                <button type="button" class="btn-del no-print" onclick="this.parentElement.remove()">X</button>
-                <span class="print-only">${nome} | ${pol} | ${obs}</span>
+                <div class="no-print input-group-vtr">
+                    <div class="field-vtr">
+                        <label>Item/Vtr:</label>
+                        <input type="text" value="${nome}" class="nome-item" placeholder="Ex: R-03000">
+                    </div>
+                    <div class="field-vtr">
+                        <label>Responsável:</label>
+                        <input type="text" value="${pol}" class="pol-item" placeholder="Ex: Cb PM Silva">
+                    </div>
+                    <div class="field-vtr">
+                        <label>Observações:</label>
+                        <input type="text" value="${obs}" class="obs-item" placeholder="Ex: Em carga">
+                    </div>
+                    <button type="button" class="btn-del" onclick="this.parentElement.parentElement.remove()">X</button>
+                </div>
+                <span class="print-only print-line">${nome} | ${pol} ${obs ? '| ' + obs : ''}</span>
             `;
             container.appendChild(div);
         };
@@ -52,14 +63,14 @@
                 preencherCampos(reg, true);
                 document.getElementById('assinatura-area').innerHTML = `<div class="auth-box"><strong>Assinado eletronicamente por:</strong> ${reg.assinatura}</div>`;
             } else {
-                alert("Nenhum registro encontrado para " + dataPura + " às " + horaPura);
+                alert("Nenhum registro encontrado para esta data/hora.");
             }
         };
 
         function preencherCampos(reg, bloquear) {
             document.getElementById('pol-sai').value = reg.polSaindo || "";
             document.getElementById('pol-entra').value = reg.polEntrando || "";
-            document.getElementById('turno-relatorio').value = reg.turno || "06h00 às 18h00";
+            document.getElementById('turno-relatorio').value = reg.turno || "";
             document.getElementById('ppri').value = reg.ppri || "";
             document.getElementById('sicoordop').value = reg.sicoordop || "";
             document.getElementById('protocolo').value = reg.protocolo || "";
@@ -71,8 +82,10 @@
 
             const inputs = document.querySelectorAll('input, textarea, select');
             inputs.forEach(i => { 
-                if(i.id !== 'data-busca' && i.id !== 'hora-busca') i.readOnly = bloquear; 
-                if(i.tagName === 'SELECT' && i.id !== 'hora-busca') i.disabled = bloquear;
+                if(i.id !== 'data-busca' && i.id !== 'hora-busca') {
+                    i.readOnly = bloquear;
+                    if(i.tagName === 'SELECT') i.disabled = bloquear;
+                }
             });
             
             document.getElementById('btnSalvar').style.display = bloquear ? 'none' : 'block';
@@ -87,11 +100,11 @@
             document.getElementById('btnSalvar').style.display = 'block';
             document.getElementById('btnNova').style.display = 'none';
             document.getElementById('assinatura-area').innerHTML = "";
-            alert("Campos liberados. O texto anterior foi mantido para edição.");
+            alert("Campos liberados. Atualize os dados e assine o novo turno.");
         };
 
         window.salvarRegistro = async () => {
-            const nomeAssinatura = prompt("Digite seu NOME e RE para assinar:");
+            const nomeAssinatura = prompt("Digite seu NOME e RE para assinatura:");
             if(!nomeAssinatura) return alert("Assinatura obrigatória.");
 
             const dataPura = document.getElementById('data-busca').value;
@@ -116,7 +129,7 @@
 
             try {
                 await addDoc(collection(db, "passagens"), registro);
-                alert("Passagem assinada e salva com sucesso!");
+                alert("Passagem salva com sucesso!");
                 preencherCampos(registro, true);
                 document.getElementById('assinatura-area').innerHTML = `<div class="auth-box"><strong>Assinado eletronicamente por:</strong> ${registro.assinatura}</div>`;
             } catch (e) {
@@ -125,68 +138,82 @@
         };
     </script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #e9ecef; padding: 20px; }
-        .container { max-width: 950px; margin: auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, sans-serif; background: #eef2f7; padding: 20px; color: #333; }
+        .container { max-width: 950px; margin: auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
         .seletor-busca { background: #1a365d; color: white; padding: 20px; border-radius: 8px; margin-bottom: 25px; display: flex; gap: 15px; align-items: center; justify-content: center; }
-        h1 { text-align: center; color: #1a365d; border-bottom: 3px solid #1a365d; margin-bottom: 25px; }
-        h2 { background: #f8f9fa; color: #1a365d; padding: 10px; border-left: 5px solid #1a365d; margin-top: 25px; }
-        .row-item { display: grid; grid-template-columns: 1fr 1fr 2fr 45px; gap: 8px; margin-bottom: 10px; }
-        textarea, input, select { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 4px; }
-        .btn-save { background: #28a745; color: white; width: 100%; padding: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; }
-        .btn-nova { background: #007bff; color: white; width: 100%; padding: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; display: none; margin-top: 20px; }
-        .auth-box { border: 2px dashed #1a365d; padding: 20px; margin-top: 20px; background: #f0f7ff; text-align: center; font-style: italic; }
+        h1 { text-align: center; color: #1a365d; border-bottom: 3px solid #1a365d; padding-bottom: 10px; }
+        h2 { background: #f8f9fa; color: #1a365d; padding: 10px; border-left: 5px solid #1a365d; margin-top: 30px; font-size: 1.2em; }
+        
+        /* Layout de Inserção com Nomes dos Campos */
+        .input-group-vtr { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; background: #f1f4f8; padding: 10px; border-radius: 6px; }
+        .field-vtr { display: flex; flex-direction: column; flex: 1; }
+        .field-vtr label { font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px; }
+        
+        textarea, input, select { width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; }
+        .btn-del { background: #dc3545; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-save { background: #28a745; color: white; width: 100%; padding: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; font-size: 16px; }
+        .btn-nova { background: #007bff; color: white; width: 100%; padding: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; display: none; margin-top: 20px; font-size: 16px; }
+        .auth-box { border: 2px dashed #1a365d; padding: 20px; margin-top: 20px; background: #f0f7ff; text-align: center; font-style: italic; font-weight: bold; }
+        
         .print-only { display: none; }
+
         @media print {
             .no-print { display: none !important; }
-            .print-only { display: block; margin-bottom: 5px; }
-            .container { box-shadow: none; padding: 0; border: none; }
-            textarea, input { border: none !important; }
-            .row-item input { display: none; }
+            .print-only { display: block; }
+            .container { box-shadow: none; padding: 0; width: 100%; }
+            .print-line { border-bottom: 1px solid #eee; padding: 3px 0; font-size: 11pt; }
+            textarea { border: none !important; resize: none; overflow: visible !important; }
+            h2 { border-left: none; padding-left: 0; text-decoration: underline; background: none; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="seletor-busca no-print">
-            <strong>DATA INÍCIO:</strong>
-            <input type="date" id="data-busca">
-            <strong>HORA INÍCIO:</strong>
+            <strong>BUSCAR INÍCIO:</strong>
+            <input type="date" id="data-busca" style="width: auto;">
             <select id="hora-busca" style="width: auto;">
                 <option value="06:00">06:00</option>
                 <option value="18:00">18:00</option>
             </select>
-            <button onclick="consultarRelatorio()" style="cursor:pointer; padding: 10px 20px; font-weight:bold; background:#ffc107; border:none; border-radius:4px; margin-left: 10px;">BUSCAR RELATÓRIO</button>
+            <button onclick="consultarRelatorio()" style="cursor:pointer; padding: 10px 20px; font-weight:bold; background:#ffc107; border:none; border-radius:4px;">BUSCAR</button>
         </div>
 
-        <h1>3.BPRv - Livro de Passagem de Serviço</h1>
+        <h1>3.BPRv - Passagem de Serviço</h1>
         
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:15px;">
-            <div><label>Policial Saindo:</label><input type="text" id="pol-sai" placeholder="Ex: Cb PM Nielsen"></div>
-            <div><label>Policial Entrando:</label><input type="text" id="pol-entra" placeholder="Ex: Cb PM Daniel Silva"></div>
-            <div><label>Turno do Serviço:</label>
+            <div><label>Policial Saindo:</label><input type="text" id="pol-sai"></div>
+            <div><label>Policial Entrando:</label><input type="text" id="pol-entra"></div>
+            <div><label>Turno:</label>
                 <select id="turno-relatorio">
                     <option value="06h00 às 18h00">06h00 às 18h00</option>
                     <option value="18h00 às 06h00">18h00 às 06h00</option>
-                    <option value="06h00 às 06h00">06h00 às 06h00</option>
+                    <option value="06h00 às 06h00">06h00 às 06h00 (24h)</option>
                 </select>
             </div>
         </div>
 
-        <h2>1. PPRI</h2><textarea id="ppri" rows="8"></textarea>
-        <h2>2. SICOORDOP</h2><textarea id="sicoordop" rows="5"></textarea>
+        <h2>1. PPRI (Ordens e Instruções)</h2>
+        <textarea id="ppri" rows="8"></textarea>
+
+        <h2>2. SICOORDOP (Ocorrências)</h2>
+        <textarea id="sicoordop" rows="5"></textarea>
         
         <h2>3. VIATURAS E MATERIAIS</h2>
         <div id="lista-materiais"></div>
-        <button type="button" class="no-print" onclick="addRow()" style="margin-top:10px; cursor:pointer;">+ Adicionar Item</button>
+        <button type="button" class="no-print" onclick="addRow()" style="margin-top:10px; cursor:pointer; padding:8px; background:#1a365d; color:white; border:none; border-radius:4px;">+ Adicionar Item / Viatura</button>
 
-        <h2>4. PROTOCOLO</h2><textarea id="protocolo" rows="5"></textarea>
-        <h2>5. LIVRE ATENDENTE</h2><textarea id="livre-atendente" rows="20"></textarea>
+        <h2>4. PROTOCOLO</h2>
+        <textarea id="protocolo" rows="5"></textarea>
+
+        <h2>5. LIVRE ATENDENTE</h2>
+        <textarea id="livre-atendente" rows="20"></textarea>
 
         <div id="assinatura-area"></div>
 
-        <button id="btnSalvar" class="btn-save no-print" onclick="salvarRegistro()">ASSINAR E REGISTRAR PASSAGEM</button>
+        <button id="btnSalvar" class="btn-save no-print" onclick="salvarRegistro()">ASSINAR E REGISTRAR</button>
         <button id="btnNova" class="btn-nova no-print" onclick="prepararNova()">EFETUAR NOVA PASSAGEM (BASEADA NESTA)</button>
-        <button class="no-print" style="width:100%; margin-top:10px; padding:12px; background:#6c757d; color:white; border:none; cursor:pointer; border-radius: 6px;" onclick="window.print()">GERAR PDF / IMPRIMIR</button>
+        <button class="no-print" style="width:100%; margin-top:10px; padding:12px; background:#6c757d; color:white; border:none; cursor:pointer; border-radius:6px;" onclick="window.print()">GERAR PDF / IMPRIMIR</button>
     </div>
 </body>
 </html>
