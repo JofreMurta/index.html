@@ -4,202 +4,262 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3.BPRv - Livro de Passagem Eletrônico</title>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef2f7; padding: 20px; }
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyCNrhC9tfS-qzEnj22mAA0VMULeP3abk70",
-            authDomain: "passagemserv3bprv.firebaseapp.com",
-            projectId: "passagemserv3bprv",
-            storageBucket: "passagemserv3bprv.firebasestorage.app",
-            messagingSenderId: "6420472559",
-            appId: "1:6420472559:web:132cf3fc9a0bbcdf2711a"
-        };
+        /* ── TELA DE LOGIN ── */
+        #tela-login {
+            max-width: 420px; margin: 80px auto; background: white;
+            padding: 40px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.12);
+        }
+        #tela-login h2 { text-align: center; color: #1a365d; margin-bottom: 8px; }
+        #tela-login p.subtitulo { text-align: center; color: #666; font-size: 13px; margin-bottom: 28px; }
+        .field-login { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
+        .field-login label { font-size: 12px; font-weight: bold; color: #444; }
+        .field-login input {
+            padding: 10px 12px; border: 1px solid #ced4da; border-radius: 6px;
+            font-size: 14px; width: 100%;
+        }
+        .field-login input:focus { outline: none; border-color: #1a365d; }
+        .btn-login {
+            width: 100%; padding: 12px; background: #1a365d; color: white;
+            border: none; border-radius: 6px; font-size: 15px; font-weight: bold;
+            cursor: pointer; margin-top: 8px;
+        }
+        .btn-login:hover { background: #152c4e; }
+        #msg-login { margin-top: 12px; text-align: center; font-size: 13px; min-height: 18px; }
+        #msg-login.erro { color: #dc3545; }
+        #msg-login.ok { color: #28a745; }
+        .link-cadastro {
+            text-align: center; margin-top: 16px; font-size: 13px; color: #666;
+        }
+        .link-cadastro a { color: #1a365d; cursor: pointer; text-decoration: underline; }
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        /* ── CONTAINER PRINCIPAL ── */
+        #app { display: none; }
+        .container { max-width: 950px; margin: auto; background: white; padding: 35px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
 
-        // FUNÇÃO DE RASCUNHO (LocalStorage)
-        const saveDraft = () => {
-            const draft = {
-                polSaindo: document.getElementById('pol-sai').value,
-                polEntrando: document.getElementById('pol-entra').value,
-                turno: document.getElementById('turno-relatorio').value,
-                ppri: document.getElementById('ppri').value,
-                sicoordop: document.getElementById('sicoordop').value,
-                protocolo: document.getElementById('protocolo').value,
-                livreAtendente: document.getElementById('livre-atendente').value,
-                itens: Array.from(document.querySelectorAll('.row-item')).map(row => ({
-                    nome: row.querySelector('.nome-item').value,
-                    pol: row.querySelector('.pol-item').value,
-                    obs: row.querySelector('.obs-item').value
-                }))
-            };
-            localStorage.setItem('rascunho_bprv', JSON.stringify(draft));
-        };
+        /* ── BARRA SUPERIOR ── */
+        .barra-usuario {
+            background: #1a365d; color: white; padding: 10px 20px;
+            border-radius: 8px; margin-bottom: 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 13px;
+        }
+        .btn-logout {
+            background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+            color: white; padding: 5px 12px; border-radius: 4px; cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,0.25); }
 
-        const loadDraft = () => {
-            const saved = localStorage.getItem('rascunho_bprv');
-            if (saved) {
-                const draft = JSON.parse(saved);
-                document.getElementById('pol-sai').value = draft.polSaindo || "";
-                document.getElementById('pol-entra').value = draft.polEntrando || "";
-                document.getElementById('turno-relatorio').value = draft.turno || "06h00 às 18h00";
-                document.getElementById('ppri').value = draft.ppri || "";
-                document.getElementById('sicoordop').value = draft.sicoordop || "";
-                document.getElementById('protocolo').value = draft.protocolo || "";
-                document.getElementById('livre-atendente').value = draft.livreAtendente || "";
-                document.getElementById('lista-materiais').innerHTML = "";
-                if(draft.itens) draft.itens.forEach(i => window.addRow(i.nome, i.pol, i.obs));
-            }
-        };
-
-        window.onload = () => {
-            const hoje = new Date().toISOString().split('T')[0];
-            document.getElementById('data-busca').value = hoje;
-            loadDraft();
-            document.getElementById('container-geral').addEventListener('input', saveDraft);
-        };
-
-        window.addRow = (nome="", pol="", obs="") => {
-            const container = document.getElementById('lista-materiais');
-            const div = document.createElement('div');
-            div.className = 'row-item';
-            div.innerHTML = `
-                <div class="no-print input-group-vtr">
-                    <div class="field-vtr"><label>Item/Vtr:</label><input type="text" value="${nome}" class="nome-item"></div>
-                    <div class="field-vtr"><label>Responsável:</label><input type="text" value="${pol}" class="pol-item"></div>
-                    <div class="field-vtr"><label>Observações:</label><input type="text" value="${obs}" class="obs-item"></div>
-                    <button type="button" class="btn-del" onclick="this.parentElement.parentElement.remove(); saveDraft();">X</button>
-                </div>
-                <span class="print-only print-line">${nome} | ${pol} ${obs ? '| ' + obs : ''}</span>
-            `;
-            container.appendChild(div);
-            saveDraft();
-        };
-
-        // CONSULTA ANTIGA RESTAURADA: Busca por proximidade de data/hora
-        window.consultarRelatorio = async () => {
-            const dataPura = document.getElementById('data-busca').value;
-            const horaPura = document.getElementById('hora-busca').value;
-            const dataBusca = new Date(`${dataPura}T${horaPura}:00`);
-
-            const q = query(
-                collection(db, "passagens"), 
-                where("timestamp", "<=", dataBusca),
-                orderBy("timestamp", "desc"),
-                limit(1)
-            );
-            
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                const reg = querySnapshot.docs[0].data();
-                preencherCampos(reg, true);
-                document.getElementById('assinatura-area').innerHTML = `<div class="auth-box">Relatório Oficial - Assinado por: ${reg.assinatura}</div>`;
-            } else {
-                alert("Nenhum registro encontrado.");
-            }
-        };
-
-        function preencherCampos(reg, bloquear) {
-            document.getElementById('pol-sai').value = reg.polSaindo || "";
-            document.getElementById('pol-entra').value = reg.polEntrando || "";
-            document.getElementById('turno-relatorio').value = reg.turno || "06h00 às 18h00";
-            document.getElementById('ppri').value = reg.ppri || "";
-            document.getElementById('sicoordop').value = reg.sicoordop || "";
-            document.getElementById('protocolo').value = reg.protocolo || "";
-            document.getElementById('livre-atendente').value = reg.livreAtendente || "";
-            document.getElementById('lista-materiais').innerHTML = "";
-            if(reg.itens) reg.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
-
-            const inputs = document.querySelectorAll('input, textarea, select');
-            inputs.forEach(i => { 
-                if(i.id !== 'data-busca' && i.id !== 'hora-busca') {
-                    i.readOnly = bloquear;
-                    if(i.tagName === 'SELECT') i.disabled = bloquear;
-                }
-            });
-            document.getElementById('btnSalvar').style.display = bloquear ? 'none' : 'block';
-            document.getElementById('btnNova').style.display = bloquear ? 'block' : 'none';
+        /* ── SELETOR DE BUSCA ── */
+        .seletor-busca {
+            background: #1a365d; color: white; padding: 15px; border-radius: 8px;
+            margin-bottom: 25px; display: flex; gap: 15px; align-items: center; justify-content: center;
+            flex-wrap: wrap;
+        }
+        .seletor-busca input, .seletor-busca select {
+            width: auto; padding: 8px 10px; border: none; border-radius: 4px;
+            font-size: 14px;
         }
 
-        window.prepararNova = () => {
-            document.querySelectorAll('input, textarea, select').forEach(i => { i.readOnly = false; i.disabled = false; });
-            document.getElementById('btnSalvar').style.display = 'block';
-            document.getElementById('btnNova').style.display = 'none';
-            document.getElementById('assinatura-area').innerHTML = "";
-            saveDraft();
-        };
+        h1 { text-align: center; color: #1a365d; border-bottom: 3px solid #1a365d; padding-bottom: 10px; margin-bottom: 20px; }
+        h2 { background: #f8f9fa; color: #1a365d; padding: 8px 12px; border-left: 5px solid #1a365d; margin-top: 25px; margin-bottom: 12px; }
 
-        window.salvarRegistro = async () => {
-            const nomeAssinatura = prompt("Digite seu NOME e RE para assinatura eletrônica:");
-            if(!nomeAssinatura) return;
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+        .grid-3 label { font-size: 12px; font-weight: bold; color: #555; display: block; margin-bottom: 4px; }
 
-            const dataPura = document.getElementById('data-busca').value;
-            const horaPura = document.getElementById('hora-busca').value;
+        textarea, input[type="text"], select {
+            width: 100%; padding: 10px; border: 1px solid #ced4da;
+            border-radius: 4px; font-family: inherit; font-size: 14px;
+        }
+        textarea:focus, input[type="text"]:focus, select:focus {
+            outline: none; border-color: #1a365d;
+        }
+        textarea[readonly], input[readonly], select:disabled {
+            background: #f8f9fa; color: #555; cursor: default;
+        }
 
-            const registro = {
-                timestamp: new Date(`${dataPura}T${horaPura}:00`),
-                polSaindo: document.getElementById('pol-sai').value,
-                polEntrando: document.getElementById('pol-entra').value,
-                turno: document.getElementById('turno-relatorio').value,
-                ppri: document.getElementById('ppri').value,
-                sicoordop: document.getElementById('sicoordop').value,
-                protocolo: document.getElementById('protocolo').value,
-                livreAtendente: document.getElementById('livre-atendente').value,
-                assinatura: `${nomeAssinatura} em ${new Date().toLocaleString('pt-BR')}`,
-                itens: Array.from(document.querySelectorAll('.row-item')).map(row => ({
-                    nome: row.querySelector('.nome-item').value,
-                    pol: row.querySelector('.pol-item').value,
-                    obs: row.querySelector('.obs-item').value
-                }))
-            };
-
-            try {
-                await addDoc(collection(db, "passagens"), registro);
-                localStorage.removeItem('rascunho_bprv');
-                alert("Passagem assinada e salva com sucesso!");
-                preencherCampos(registro, true);
-            } catch (e) {
-                alert("Erro ao salvar: " + e);
-            }
-        };
-        window.saveDraft = saveDraft;
-    </script>
-    <style>
-        body { font-family: 'Segoe UI', Arial; background: #eef2f7; padding: 20px; }
-        .container { max-width: 950px; margin: auto; background: white; padding: 35px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
-        .seletor-busca { background: #1a365d; color: white; padding: 15px; border-radius: 8px; margin-bottom: 25px; display: flex; gap: 15px; align-items: center; justify-content: center; }
-        h1 { text-align: center; color: #1a365d; border-bottom: 3px solid #1a365d; }
-        h2 { background: #f8f9fa; color: #1a365d; padding: 8px; border-left: 5px solid #1a365d; margin-top: 25px; }
-        .input-group-vtr { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; background: #f8f9fa; padding: 10px; border-radius: 6px; }
+        .input-group-vtr {
+            display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px;
+            background: #f8f9fa; padding: 10px; border-radius: 6px;
+        }
         .field-vtr { display: flex; flex-direction: column; flex: 1; }
-        .field-vtr label { font-size: 11px; font-weight: bold; color: #666; }
-        textarea, input, select { width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; }
-        .btn-del { background: #dc3545; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; }
-        .btn-save { background: #28a745; color: white; width: 100%; padding: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; }
-        .btn-nova { background: #007bff; color: white; width: 100%; padding: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; display: none; margin-top: 20px; }
-        .auth-box { border: 2px dashed #1a365d; padding: 15px; margin-top: 20px; background: #f0f7ff; text-align: center; font-weight: bold; }
+        .field-vtr label { font-size: 11px; font-weight: bold; color: #666; margin-bottom: 3px; }
+        .btn-del {
+            background: #dc3545; color: white; border: none;
+            padding: 10px 14px; border-radius: 4px; cursor: pointer; white-space: nowrap;
+        }
+
+        /* ── BOTÕES DE AÇÃO ── */
+        .btn-save {
+            background: #28a745; color: white; width: 100%; padding: 18px;
+            font-weight: bold; font-size: 16px; border: none; border-radius: 6px;
+            cursor: pointer; margin-top: 20px;
+        }
+        .btn-save:hover { background: #218838; }
+        .btn-nova {
+            background: #007bff; color: white; width: 100%; padding: 18px;
+            font-weight: bold; font-size: 16px; border: none; border-radius: 6px;
+            cursor: pointer; display: none; margin-top: 20px;
+        }
+        .btn-nova:hover { background: #0069d9; }
+        .btn-pdf {
+            width: 100%; margin-top: 10px; padding: 12px;
+            background: #6c757d; color: white; border: none;
+            cursor: pointer; border-radius: 6px; font-size: 14px;
+        }
+        .btn-pdf:hover { background: #5a6268; }
+        .btn-add {
+            margin-top: 10px; cursor: pointer; padding: 8px 16px;
+            background: #1a365d; color: white; border: none;
+            border-radius: 4px; font-size: 14px;
+        }
+
+        /* ── ASSINATURA ── */
+        .auth-box {
+            border: 2px dashed #1a365d; padding: 15px; margin-top: 20px;
+            background: #f0f7ff; text-align: center; font-weight: bold;
+            border-radius: 4px; color: #1a365d;
+        }
+
+        /* ── TOAST / NOTIFICAÇÕES ── */
+        #toast-container {
+            position: fixed; bottom: 30px; right: 30px;
+            display: flex; flex-direction: column; gap: 10px; z-index: 9999;
+        }
+        .toast {
+            padding: 14px 20px; border-radius: 8px; color: white;
+            font-size: 14px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            animation: slidein .3s ease; min-width: 280px;
+        }
+        .toast.sucesso { background: #28a745; }
+        .toast.erro { background: #dc3545; }
+        .toast.info { background: #1a365d; }
+        @keyframes slidein { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* ── MODAL ── */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5); z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.ativo { display: flex; }
+        .modal-box {
+            background: white; padding: 30px; border-radius: 12px;
+            width: 100%; max-width: 420px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .modal-box h3 { color: #1a365d; margin-bottom: 8px; }
+        .modal-box p { color: #555; font-size: 13px; margin-bottom: 16px; }
+        .modal-box input {
+            width: 100%; padding: 10px; border: 1px solid #ced4da;
+            border-radius: 6px; font-size: 14px; margin-bottom: 16px;
+        }
+        .modal-box input:focus { outline: none; border-color: #1a365d; }
+        .modal-btns { display: flex; gap: 10px; }
+        .modal-btns button { flex: 1; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-confirmar { background: #28a745; color: white; }
+        .btn-cancelar { background: #6c757d; color: white; }
+
+        /* ── LOADING ── */
+        .loading {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+            border-radius: 50%; animation: spin .7s linear infinite;
+            vertical-align: middle; margin-right: 6px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── IMPRESSÃO ── */
         .print-only { display: none; }
-        @media print { .no-print { display: none !important; } .print-only { display: block; border-bottom: 1px solid #eee; padding: 2px 0; } .container { box-shadow: none; padding: 0; } textarea { border: none !important; overflow: visible !important; } }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block; border-bottom: 1px solid #eee; padding: 2px 0; }
+            .container { box-shadow: none; padding: 0; }
+            textarea { border: none !important; overflow: visible !important; resize: none; }
+            #app { display: block !important; }
+            #tela-login { display: none !important; }
+        }
     </style>
 </head>
 <body>
+
+<!-- ═══════════════════════════════════════
+     TELA DE LOGIN
+═══════════════════════════════════════ -->
+<div id="tela-login">
+    <h2>3.BPRv</h2>
+    <p class="subtitulo">Livro de Passagem Eletrônico<br>Acesso restrito a pessoal autorizado</p>
+
+    <div id="form-login">
+        <div class="field-login">
+            <label>E-mail institucional</label>
+            <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="username">
+        </div>
+        <div class="field-login">
+            <label>Senha</label>
+            <input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="btn-login" id="btn-entrar" onclick="fazerLogin()">ENTRAR</button>
+        <div id="msg-login"></div>
+        <div class="link-cadastro">
+            Primeiro acesso? <a onclick="alternarFormulario('cadastro')">Criar conta</a>
+        </div>
+    </div>
+
+    <div id="form-cadastro" style="display:none">
+        <div class="field-login">
+            <label>Nome completo e RE</label>
+            <input type="text" id="cad-nome" placeholder="Ex: Cel. João Silva - RE 12345">
+        </div>
+        <div class="field-login">
+            <label>E-mail institucional</label>
+            <input type="email" id="cad-email" placeholder="seu@email.com">
+        </div>
+        <div class="field-login">
+            <label>Senha (mínimo 6 caracteres)</label>
+            <input type="password" id="cad-senha" placeholder="••••••••">
+        </div>
+        <button class="btn-login" id="btn-cadastrar" onclick="fazerCadastro()">CRIAR CONTA</button>
+        <div id="msg-login"></div>
+        <div class="link-cadastro">
+            Já tem conta? <a onclick="alternarFormulario('login')">Fazer login</a>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     APLICAÇÃO PRINCIPAL
+═══════════════════════════════════════ -->
+<div id="app">
     <div class="container" id="container-geral">
+
+        <!-- Barra do usuário -->
+        <div class="barra-usuario no-print">
+            <span>&#128100; <span id="nome-usuario">Carregando...</span></span>
+            <button class="btn-logout" onclick="fazerLogout()">Sair</button>
+        </div>
+
+        <!-- Seletor de busca -->
         <div class="seletor-busca no-print">
-            <strong>DATA INÍCIO:</strong> <input type="date" id="data-busca" style="width: auto;">
-            <strong>HORA INÍCIO:</strong> 
-            <select id="hora-busca" style="width: auto;">
+            <strong>DATA INÍCIO:</strong>
+            <input type="date" id="data-busca" style="width:auto;">
+            <strong>HORA INÍCIO:</strong>
+            <select id="hora-busca" style="width:auto;">
                 <option value="06:00">06:00</option>
                 <option value="18:00">18:00</option>
             </select>
-            <button onclick="consultarRelatorio()" style="cursor:pointer; padding: 8px 15px; font-weight:bold; background:#ffc107; border:none; border-radius:4px;">BUSCAR</button>
+            <button onclick="consultarRelatorio()"
+                style="cursor:pointer; padding:8px 15px; font-weight:bold;
+                       background:#ffc107; border:none; border-radius:4px;"
+                id="btn-buscar">BUSCAR</button>
         </div>
 
         <h1>3.BPRv - Livro de Passagem de Serviço</h1>
-        
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:15px;">
+
+        <div class="grid-3">
             <div><label>Saindo:</label><input type="text" id="pol-sai"></div>
             <div><label>Entrando:</label><input type="text" id="pol-entra"></div>
             <div><label>Turno:</label>
@@ -211,18 +271,488 @@
             </div>
         </div>
 
-        <h2>1. PPRI</h2><textarea id="ppri" rows="8"></textarea>
-        <h2>2. SICOORDOP</h2><textarea id="sicoordop" rows="5"></textarea>
-        <h2>3. VIATURAS E MATERIAIS</h2><div id="lista-materiais"></div>
-        <button type="button" class="no-print" onclick="addRow()" style="margin-top:10px; cursor:pointer; padding:8px; background:#1a365d; color:white; border:none; border-radius:4px;">+ Adicionar Viatura</button>
-        <h2>4. PROTOCOLO</h2><textarea id="protocolo" rows="5"></textarea>
-        <h2>5. LIVRE ATENDENTE</h2><textarea id="livre-atendente" rows="20"></textarea>
-        
+        <h2>1. PPRI</h2>
+        <textarea id="ppri" rows="8"></textarea>
+
+        <h2>2. SICOORDOP</h2>
+        <textarea id="sicoordop" rows="5"></textarea>
+
+        <h2>3. VIATURAS E MATERIAIS</h2>
+        <div id="lista-materiais"></div>
+        <button type="button" class="btn-add no-print" onclick="addRow()">+ Adicionar Viatura</button>
+
+        <h2>4. PROTOCOLO</h2>
+        <textarea id="protocolo" rows="5"></textarea>
+
+        <h2>5. LIVRE ATENDENTE</h2>
+        <textarea id="livre-atendente" rows="20"></textarea>
+
         <div id="assinatura-area"></div>
-        
-        <button id="btnSalvar" class="btn-save no-print" onclick="salvarRegistro()">ASSINAR E REGISTRAR</button>
-        <button id="btnNova" class="btn-nova no-print" onclick="prepararNova()">EFETUAR NOVA PASSAGEM (BASEADA NESTA)</button>
-        <button class="no-print" style="width:100%; margin-top:10px; padding:12px; background:#6c757d; color:white; border:none; cursor:pointer; border-radius:6px;" onclick="window.print()">GERAR PDF</button>
+
+        <button id="btnSalvar" class="btn-save no-print" onclick="abrirModalAssinatura()">
+            ASSINAR E REGISTRAR
+        </button>
+        <button id="btnNova" class="btn-nova no-print" onclick="prepararNova()">
+            EFETUAR NOVA PASSAGEM (BASEADA NESTA)
+        </button>
+        <button class="btn-pdf no-print" onclick="window.print()">GERAR PDF</button>
+
+    </div><!-- /container -->
+</div><!-- /app -->
+
+<!-- ═══════════════════════════════════════
+     MODAL DE ASSINATURA
+═══════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-assinatura">
+    <div class="modal-box">
+        <h3>Assinatura Eletrônica</h3>
+        <p>Confirme sua identidade para assinar este registro.<br>
+           Sua assinatura será vinculada à sua conta autenticada.</p>
+        <input type="text" id="input-assinatura"
+               placeholder="Confirme seu Nome e RE (ex: Ten. Silva - RE 9876)">
+        <div class="modal-btns">
+            <button class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
+            <button class="btn-confirmar" id="btn-confirmar-assinatura"
+                    onclick="salvarRegistro()">Assinar e Registrar</button>
+        </div>
     </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     TOAST CONTAINER
+═══════════════════════════════════════ -->
+<div id="toast-container"></div>
+
+<!-- ═══════════════════════════════════════
+     FIREBASE + LÓGICA
+═══════════════════════════════════════ -->
+<script type="module">
+import { initializeApp }         from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc, query,
+         where, getDocs, orderBy, limit,
+         serverTimestamp }        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword,
+         signInWithEmailAndPassword, signOut,
+         onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+// ── Configuração Firebase ──────────────────────────────────────────────────
+const firebaseConfig = {
+    apiKey:            "AIzaSyCNrhC9tfS-qzEnj22mAA0VMULeP3abk70",
+    authDomain:        "passagemserv3bprv.firebaseapp.com",
+    projectId:         "passagemserv3bprv",
+    storageBucket:     "passagemserv3bprv.firebasestorage.app",
+    messagingSenderId: "6420472559",
+    appId:             "1:6420472559:web:132cf3fc9a0bbcdf2711a"
+};
+
+const app  = initializeApp(firebaseConfig);
+const db   = getFirestore(app);
+const auth = getAuth(app);
+
+// ── Utilitários de UI ──────────────────────────────────────────────────────
+function toast(msg, tipo = 'info', duracao = 4000) {
+    const c = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    t.className = `toast ${tipo}`;
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), duracao);
+}
+
+function setCarregando(btnId, estado) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (estado) {
+        btn.dataset.textoOriginal = btn.innerHTML;
+        btn.innerHTML = '<span class="loading"></span>Aguarde...';
+        btn.disabled = true;
+    } else {
+        btn.innerHTML = btn.dataset.textoOriginal || btn.innerHTML;
+        btn.disabled = false;
+    }
+}
+
+// ── Monitoramento de autenticação ──────────────────────────────────────────
+onAuthStateChanged(auth, usuario => {
+    if (usuario) {
+        document.getElementById('tela-login').style.display = 'none';
+        document.getElementById('app').style.display        = 'block';
+        const nomeExibir = usuario.displayName || usuario.email;
+        document.getElementById('nome-usuario').textContent  = nomeExibir;
+        iniciarApp();
+    } else {
+        document.getElementById('tela-login').style.display = 'block';
+        document.getElementById('app').style.display        = 'none';
+    }
+});
+
+// ── Login / Cadastro / Logout ──────────────────────────────────────────────
+window.alternarFormulario = (modo) => {
+    const isLogin = (modo === 'login');
+    document.getElementById('form-login').style.display    = isLogin ? 'block' : 'none';
+    document.getElementById('form-cadastro').style.display = isLogin ? 'none'  : 'block';
+    document.getElementById('msg-login').textContent = '';
+};
+
+window.fazerLogin = async () => {
+    const email = document.getElementById('login-email').value.trim();
+    const senha  = document.getElementById('login-senha').value;
+    const msgEl  = document.getElementById('msg-login');
+    msgEl.textContent = '';
+
+    if (!email || !senha) {
+        msgEl.className = 'erro'; msgEl.textContent = 'Preencha e-mail e senha.'; return;
+    }
+    setCarregando('btn-entrar', true);
+    try {
+        await signInWithEmailAndPassword(auth, email, senha);
+    } catch (e) {
+        msgEl.className = 'erro';
+        msgEl.textContent = traduzirErroAuth(e.code);
+        setCarregando('btn-entrar', false);
+    }
+};
+
+window.fazerCadastro = async () => {
+    const nome  = document.getElementById('cad-nome').value.trim();
+    const email = document.getElementById('cad-email').value.trim();
+    const senha  = document.getElementById('cad-senha').value;
+    const msgEl  = document.getElementById('msg-login');
+    msgEl.textContent = '';
+
+    if (!nome || !email || !senha) {
+        msgEl.className = 'erro'; msgEl.textContent = 'Preencha todos os campos.'; return;
+    }
+    if (senha.length < 6) {
+        msgEl.className = 'erro'; msgEl.textContent = 'Senha deve ter ao menos 6 caracteres.'; return;
+    }
+    setCarregando('btn-cadastrar', true);
+    try {
+        const cred = await createUserWithEmailAndPassword(auth, email, senha);
+        await updateProfile(cred.user, { displayName: nome });
+        msgEl.className = 'ok';
+        msgEl.textContent = 'Conta criada! Redirecionando...';
+    } catch (e) {
+        msgEl.className = 'erro';
+        msgEl.textContent = traduzirErroAuth(e.code);
+        setCarregando('btn-cadastrar', false);
+    }
+};
+
+window.fazerLogout = async () => {
+    if (confirm('Deseja sair do sistema?')) await signOut(auth);
+};
+
+function traduzirErroAuth(code) {
+    const erros = {
+        'auth/invalid-email':           'E-mail inválido.',
+        'auth/user-not-found':          'Usuário não encontrado.',
+        'auth/wrong-password':          'Senha incorreta.',
+        'auth/email-already-in-use':    'E-mail já cadastrado.',
+        'auth/weak-password':           'Senha muito fraca.',
+        'auth/too-many-requests':       'Muitas tentativas. Aguarde e tente novamente.',
+        'auth/invalid-credential':      'Credenciais inválidas. Verifique e-mail e senha.',
+    };
+    return erros[code] || `Erro: ${code}`;
+}
+
+// ── Rascunho (LocalStorage) ────────────────────────────────────────────────
+const CHAVE_RASCUNHO = 'rascunho_bprv_v2';
+
+const saveDraft = () => {
+    const draft = {
+        polSaindo:      document.getElementById('pol-sai').value,
+        polEntrando:    document.getElementById('pol-entra').value,
+        turno:          document.getElementById('turno-relatorio').value,
+        ppri:           document.getElementById('ppri').value,
+        sicoordop:      document.getElementById('sicoordop').value,
+        protocolo:      document.getElementById('protocolo').value,
+        livreAtendente: document.getElementById('livre-atendente').value,
+        itens: Array.from(document.querySelectorAll('.row-item')).map(row => ({
+            nome: row.querySelector('.nome-item').value,
+            pol:  row.querySelector('.pol-item').value,
+            obs:  row.querySelector('.obs-item').value
+        }))
+    };
+    localStorage.setItem(CHAVE_RASCUNHO, JSON.stringify(draft));
+};
+
+// Debounce: salva rascunho 600ms após última digitação
+let debounceTimer;
+const saveDraftDebounced = () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(saveDraft, 600);
+};
+
+const loadDraft = () => {
+    const saved = localStorage.getItem(CHAVE_RASCUNHO);
+    if (!saved) return;
+    try {
+        const draft = JSON.parse(saved);
+        document.getElementById('pol-sai').value            = draft.polSaindo      || '';
+        document.getElementById('pol-entra').value          = draft.polEntrando    || '';
+        document.getElementById('turno-relatorio').value    = draft.turno          || '06h00 às 18h00';
+        document.getElementById('ppri').value               = draft.ppri           || '';
+        document.getElementById('sicoordop').value          = draft.sicoordop      || '';
+        document.getElementById('protocolo').value          = draft.protocolo      || '';
+        document.getElementById('livre-atendente').value    = draft.livreAtendente || '';
+        document.getElementById('lista-materiais').innerHTML = '';
+        if (draft.itens) draft.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
+    } catch {
+        localStorage.removeItem(CHAVE_RASCUNHO);
+    }
+};
+
+// ── Inicialização do app ───────────────────────────────────────────────────
+function iniciarApp() {
+    const hoje = new Date().toISOString().split('T')[0];
+    document.getElementById('data-busca').value = hoje;
+    loadDraft();
+    document.getElementById('container-geral')
+            .addEventListener('input', saveDraftDebounced);
+}
+
+// ── Adicionar linha de viatura ─────────────────────────────────────────────
+window.addRow = (nome = '', pol = '', obs = '') => {
+    const container = document.getElementById('lista-materiais');
+    const div       = document.createElement('div');
+    div.className   = 'row-item';
+
+    // Inputs criados via DOM (evita XSS por interpolação)
+    const inputNome = document.createElement('input');
+    inputNome.type  = 'text'; inputNome.className = 'nome-item'; inputNome.value = nome;
+
+    const inputPol  = document.createElement('input');
+    inputPol.type   = 'text'; inputPol.className = 'pol-item';  inputPol.value = pol;
+
+    const inputObs  = document.createElement('input');
+    inputObs.type   = 'text'; inputObs.className = 'obs-item';  inputObs.value = obs;
+
+    const btnDel    = document.createElement('button');
+    btnDel.type     = 'button'; btnDel.className = 'btn-del';
+    btnDel.textContent = 'X';
+    btnDel.addEventListener('click', () => { div.remove(); saveDraft(); });
+
+    // Grupo visível (sem impressão)
+    const grupo = document.createElement('div');
+    grupo.className = 'no-print input-group-vtr';
+
+    const fNome = document.createElement('div'); fNome.className = 'field-vtr';
+    const lNome = document.createElement('label'); lNome.textContent = 'Item/Vtr:';
+    fNome.appendChild(lNome); fNome.appendChild(inputNome);
+
+    const fPol  = document.createElement('div'); fPol.className = 'field-vtr';
+    const lPol  = document.createElement('label'); lPol.textContent = 'Responsável:';
+    fPol.appendChild(lPol); fPol.appendChild(inputPol);
+
+    const fObs  = document.createElement('div'); fObs.className = 'field-vtr';
+    const lObs  = document.createElement('label'); lObs.textContent = 'Observações:';
+    fObs.appendChild(lObs); fObs.appendChild(inputObs);
+
+    grupo.appendChild(fNome); grupo.appendChild(fPol);
+    grupo.appendChild(fObs);  grupo.appendChild(btnDel);
+
+    // Linha de impressão
+    const printSpan = document.createElement('span');
+    printSpan.className = 'print-only print-line';
+
+    const atualizarPrintSpan = () => {
+        printSpan.textContent =
+            `${inputNome.value} | ${inputPol.value}${inputObs.value ? ' | ' + inputObs.value : ''}`;
+    };
+    [inputNome, inputPol, inputObs].forEach(el => {
+        el.addEventListener('input', () => { atualizarPrintSpan(); saveDraftDebounced(); });
+    });
+    atualizarPrintSpan();
+
+    div.appendChild(grupo);
+    div.appendChild(printSpan);
+    container.appendChild(div);
+    saveDraft();
+};
+
+// ── Consultar relatório ────────────────────────────────────────────────────
+window.consultarRelatorio = async () => {
+    const dataPura  = document.getElementById('data-busca').value;
+    const horaPura  = document.getElementById('hora-busca').value;
+
+    if (!dataPura) { toast('Selecione uma data para buscar.', 'erro'); return; }
+
+    const dataBusca = new Date(`${dataPura}T${horaPura}:00`);
+    setCarregando('btn-buscar', true);
+
+    try {
+        const q = query(
+            collection(db, 'passagens'),
+            where('dataHoraPassagem', '<=', dataBusca),
+            orderBy('dataHoraPassagem', 'desc'),
+            limit(1)
+        );
+        const snap = await getDocs(q);
+
+        if (!snap.empty) {
+            const reg = snap.docs[0].data();
+            preencherCampos(reg, true);
+            document.getElementById('assinatura-area').innerHTML =
+                `<div class="auth-box">Relatório Oficial — Assinado por: ${reg.assinatura}</div>`;
+            toast('Registro encontrado e carregado.', 'sucesso');
+        } else {
+            // Fallback: busca pelo campo legado "timestamp" (registros antigos)
+            const qLegado = query(
+                collection(db, 'passagens'),
+                where('timestamp', '<=', dataBusca),
+                orderBy('timestamp', 'desc'),
+                limit(1)
+            );
+            const snapLegado = await getDocs(qLegado);
+            if (!snapLegado.empty) {
+                const reg = snapLegado.docs[0].data();
+                preencherCampos(reg, true);
+                document.getElementById('assinatura-area').innerHTML =
+                    `<div class="auth-box">Relatório Oficial — Assinado por: ${reg.assinatura}</div>`;
+                toast('Registro encontrado (formato legado).', 'info');
+            } else {
+                toast('Nenhum registro encontrado para essa data/hora.', 'erro');
+            }
+        }
+    } catch (e) {
+        console.error('Erro ao consultar:', e);
+        toast('Erro ao buscar registro. Verifique a conexão.', 'erro');
+    } finally {
+        setCarregando('btn-buscar', false);
+    }
+};
+
+// ── Preencher campos ───────────────────────────────────────────────────────
+function preencherCampos(reg, bloquear) {
+    document.getElementById('pol-sai').value            = reg.polSaindo      || '';
+    document.getElementById('pol-entra').value          = reg.polEntrando    || '';
+    document.getElementById('turno-relatorio').value    = reg.turno          || '06h00 às 18h00';
+    document.getElementById('ppri').value               = reg.ppri           || '';
+    document.getElementById('sicoordop').value          = reg.sicoordop      || '';
+    document.getElementById('protocolo').value          = reg.protocolo      || '';
+    document.getElementById('livre-atendente').value    = reg.livreAtendente || '';
+    document.getElementById('lista-materiais').innerHTML = '';
+    if (reg.itens) reg.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
+
+    document.querySelectorAll('input, textarea, select').forEach(el => {
+        if (el.id !== 'data-busca' && el.id !== 'hora-busca') {
+            el.readOnly = bloquear;
+            if (el.tagName === 'SELECT') el.disabled = bloquear;
+        }
+    });
+    document.getElementById('btnSalvar').style.display = bloquear ? 'none'  : 'block';
+    document.getElementById('btnNova').style.display   = bloquear ? 'block' : 'none';
+}
+
+// ── Preparar nova passagem ─────────────────────────────────────────────────
+window.prepararNova = () => {
+    document.querySelectorAll('input, textarea, select').forEach(el => {
+        el.readOnly = false; el.disabled = false;
+    });
+    document.getElementById('btnSalvar').style.display = 'block';
+    document.getElementById('btnNova').style.display   = 'none';
+    document.getElementById('assinatura-area').innerHTML = '';
+    saveDraft();
+};
+
+// ── Modal de assinatura ────────────────────────────────────────────────────
+window.abrirModalAssinatura = () => {
+    const usuario = auth.currentUser;
+    if (!usuario) { toast('Sessão expirada. Faça login novamente.', 'erro'); return; }
+
+    // Pré-preenche com o displayName do usuário autenticado
+    const inputAss = document.getElementById('input-assinatura');
+    inputAss.value = usuario.displayName || '';
+    document.getElementById('modal-assinatura').classList.add('ativo');
+    inputAss.focus();
+};
+
+window.fecharModal = () => {
+    document.getElementById('modal-assinatura').classList.remove('ativo');
+};
+
+// ── Salvar registro ────────────────────────────────────────────────────────
+window.salvarRegistro = async () => {
+    const usuario     = auth.currentUser;
+    const nomeConfirm = document.getElementById('input-assinatura').value.trim();
+
+    if (!nomeConfirm) {
+        toast('Informe seu Nome e RE para assinar.', 'erro'); return;
+    }
+    if (!usuario) {
+        toast('Sessão expirada. Faça login novamente.', 'erro'); return;
+    }
+
+    // Validação de campos obrigatórios
+    const polSai   = document.getElementById('pol-sai').value.trim();
+    const polEntra = document.getElementById('pol-entra').value.trim();
+    if (!polSai || !polEntra) {
+        toast('Preencha os campos "Saindo" e "Entrando" antes de registrar.', 'erro'); return;
+    }
+
+    const dataPura = document.getElementById('data-busca').value;
+    const horaPura = document.getElementById('hora-busca').value;
+    if (!dataPura) {
+        toast('Selecione a data da passagem.', 'erro'); return;
+    }
+
+    fecharModal();
+    setCarregando('btnSalvar', true);
+
+    const registro = {
+        // dataHoraPassagem: dado operacional informado pelo usuário
+        dataHoraPassagem: new Date(`${dataPura}T${horaPura}:00`),
+        // createdAt: timestamp real do servidor (auditoria)
+        createdAt:        serverTimestamp(),
+        // Dados do usuário autenticado (rastreabilidade)
+        uid:              usuario.uid,
+        emailUsuario:     usuario.email,
+        // Conteúdo da passagem
+        polSaindo:        polSai,
+        polEntrando:      polEntra,
+        turno:            document.getElementById('turno-relatorio').value,
+        ppri:             document.getElementById('ppri').value,
+        sicoordop:        document.getElementById('sicoordop').value,
+        protocolo:        document.getElementById('protocolo').value,
+        livreAtendente:   document.getElementById('livre-atendente').value,
+        assinatura:       `${nomeConfirm} (${usuario.email}) em ${new Date().toLocaleString('pt-BR')}`,
+        itens: Array.from(document.querySelectorAll('.row-item')).map(row => ({
+            nome: row.querySelector('.nome-item').value,
+            pol:  row.querySelector('.pol-item').value,
+            obs:  row.querySelector('.obs-item').value
+        }))
+    };
+
+    try {
+        await addDoc(collection(db, 'passagens'), registro);
+        localStorage.removeItem(CHAVE_RASCUNHO);
+        toast('Passagem assinada e registrada com sucesso!', 'sucesso', 5000);
+        preencherCampos(registro, true);
+        document.getElementById('assinatura-area').innerHTML =
+            `<div class="auth-box">Relatório Oficial — Assinado por: ${registro.assinatura}</div>`;
+    } catch (e) {
+        console.error('Erro ao salvar:', e);
+        toast('Erro ao salvar. Verifique a conexão e tente novamente.', 'erro', 6000);
+    } finally {
+        setCarregando('btnSalvar', false);
+    }
+};
+
+// Fechar modal ao clicar fora
+document.getElementById('modal-assinatura')
+        .addEventListener('click', function(e) {
+            if (e.target === this) fecharModal();
+        });
+
+// Enter no modal confirma
+document.getElementById('input-assinatura')
+        .addEventListener('keydown', e => { if (e.key === 'Enter') salvarRegistro(); });
+
+// Enter nos campos de login
+document.getElementById('login-senha')
+        .addEventListener('keydown', e => { if (e.key === 'Enter') window.fazerLogin(); });
+</script>
+
 </body>
 </html>
