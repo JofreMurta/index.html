@@ -20,9 +20,10 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // CONFIGURAÇÃO DO AUTO-RASCUNHO (LocalStorage)
+        // AUTO-RASCUNHO
         const saveDraft = () => {
             const draft = {
+                dataServico: document.getElementById('data-servico').value,
                 polSaindo: document.getElementById('pol-sai').value,
                 polEntrando: document.getElementById('pol-entra').value,
                 turno: document.getElementById('turno-relatorio').value,
@@ -43,6 +44,7 @@
             const saved = localStorage.getItem('rascunho_bprv');
             if (saved) {
                 const draft = JSON.parse(saved);
+                document.getElementById('data-servico').value = draft.dataServico || new Date().toISOString().split('T')[0];
                 document.getElementById('pol-sai').value = draft.polSaindo || "";
                 document.getElementById('pol-entra').value = draft.polEntrando || "";
                 document.getElementById('turno-relatorio').value = draft.turno || "06h00 às 18h00";
@@ -50,9 +52,7 @@
                 document.getElementById('sicoordop').value = draft.sicoordop || "";
                 document.getElementById('protocolo').value = draft.protocolo || "";
                 document.getElementById('livre-atendente').value = draft.livreAtendente || "";
-                
-                const lista = document.getElementById('lista-materiais');
-                lista.innerHTML = "";
+                document.getElementById('lista-materiais').innerHTML = "";
                 if(draft.itens) draft.itens.forEach(i => window.addRow(i.nome, i.pol, i.obs));
             }
         };
@@ -60,9 +60,8 @@
         window.onload = () => {
             const hoje = new Date().toISOString().split('T')[0];
             document.getElementById('data-busca').value = hoje;
-            loadDraft(); // Carrega o rascunho ao abrir
-            
-            // Adiciona ouvinte para salvar rascunho em qualquer alteração
+            document.getElementById('data-servico').value = hoje;
+            loadDraft();
             document.getElementById('container-geral').addEventListener('input', saveDraft);
         };
 
@@ -84,21 +83,28 @@
         };
 
         window.consultarRelatorio = async () => {
-            const dataPura = document.getElementById('data-busca').value;
-            const horaPura = document.getElementById('hora-busca').value;
-            const dataBusca = new Date(`${dataPura}T${horaPura}:00`);
-            const q = query(collection(db, "passagens"), where("timestamp", "==", dataBusca), limit(1));
+            const dataBusca = document.getElementById('data-busca').value;
+            const turnoBusca = document.getElementById('turno-busca').value;
+
+            const q = query(
+                collection(db, "passagens"), 
+                where("dataServico", "==", dataBusca), 
+                where("turno", "==", turnoBusca),
+                limit(1)
+            );
+            
             const querySnapshot = await getDocs(q);
             if (!querySnapshot.empty) {
                 const reg = querySnapshot.docs[0].data();
                 preencherCampos(reg, true);
-                document.getElementById('assinatura-area').innerHTML = `<div class="auth-box">Assinado por: ${reg.assinatura}</div>`;
+                document.getElementById('assinatura-area').innerHTML = `<div class="auth-box">Relatório Oficial - Assinado por: ${reg.assinatura}</div>`;
             } else {
-                alert("Nenhum registro encontrado.");
+                alert("Nenhum registro encontrado para esta data e turno.");
             }
         };
 
         function preencherCampos(reg, bloquear) {
+            document.getElementById('data-servico').value = reg.dataServico;
             document.getElementById('pol-sai').value = reg.polSaindo;
             document.getElementById('pol-entra').value = reg.polEntrando;
             document.getElementById('turno-relatorio').value = reg.turno;
@@ -108,8 +114,14 @@
             document.getElementById('livre-atendente').value = reg.livreAtendente;
             document.getElementById('lista-materiais').innerHTML = "";
             if(reg.itens) reg.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
+
             const inputs = document.querySelectorAll('input, textarea, select');
-            inputs.forEach(i => { if(i.id !== 'data-busca' && i.id !== 'hora-busca') { i.readOnly = bloquear; if(i.tagName === 'SELECT') i.disabled = bloquear; }});
+            inputs.forEach(i => { 
+                if(i.id !== 'data-busca' && i.id !== 'turno-busca') {
+                    i.readOnly = bloquear;
+                    if(i.tagName === 'SELECT') i.disabled = bloquear;
+                }
+            });
             document.getElementById('btnSalvar').style.display = bloquear ? 'none' : 'block';
             document.getElementById('btnNova').style.display = bloquear ? 'block' : 'none';
         }
@@ -123,12 +135,11 @@
         };
 
         window.salvarRegistro = async () => {
-            const nomeAssinatura = prompt("Digite seu NOME e RE para assinatura:");
+            const nomeAssinatura = prompt("Digite seu NOME e RE para assinatura eletrônica:");
             if(!nomeAssinatura) return;
-            const dataPura = document.getElementById('data-busca').value;
-            const horaPura = document.getElementById('hora-busca').value;
+
             const registro = {
-                timestamp: new Date(`${dataPura}T${horaPura}:00`),
+                dataServico: document.getElementById('data-servico').value,
                 polSaindo: document.getElementById('pol-sai').value,
                 polEntrando: document.getElementById('pol-entra').value,
                 turno: document.getElementById('turno-relatorio').value,
@@ -138,22 +149,25 @@
                 livreAtendente: document.getElementById('livre-atendente').value,
                 assinatura: `${nomeAssinatura} em ${new Date().toLocaleString('pt-BR')}`,
                 itens: Array.from(document.querySelectorAll('.row-item')).map(row => ({
-                    nome: row.querySelector('.nome-item').value, pol: row.querySelector('.pol-item').value, obs: row.querySelector('.obs-item').value
+                    nome: row.querySelector('.nome-item').value,
+                    pol: row.querySelector('.pol-item').value,
+                    obs: row.querySelector('.obs-item').value
                 }))
             };
+
             try {
                 await addDoc(collection(db, "passagens"), registro);
-                localStorage.removeItem('rascunho_bprv'); // LIMPA RASCUNHO APÓS SALVAR COM SUCESSO
-                alert("Passagem salva com sucesso!");
+                localStorage.removeItem('rascunho_bprv');
+                alert("Passagem assinada e salva com sucesso!");
                 preencherCampos(registro, true);
-                document.getElementById('assinatura-area').innerHTML = `<div class="auth-box">Assinado por: ${registro.assinatura}</div>`;
-            } catch (e) { alert("Erro: " + e); }
+            } catch (e) {
+                alert("Erro ao salvar (verifique as permissões do Firebase): " + e);
+            }
         };
-        window.saveDraft = saveDraft; // Torna global para botões
     </script>
     <style>
         body { font-family: 'Segoe UI', Arial; background: #eef2f7; padding: 20px; }
-        .container { max-width: 950px; margin: auto; background: white; padding: 35px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 35px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
         .seletor-busca { background: #1a365d; color: white; padding: 15px; border-radius: 8px; margin-bottom: 25px; display: flex; gap: 15px; align-items: center; justify-content: center; }
         h1 { text-align: center; color: #1a365d; border-bottom: 3px solid #1a365d; }
         h2 { background: #f8f9fa; color: #1a365d; padding: 8px; border-left: 5px solid #1a365d; margin-top: 25px; }
@@ -161,7 +175,6 @@
         .field-vtr { display: flex; flex-direction: column; flex: 1; }
         .field-vtr label { font-size: 11px; font-weight: bold; color: #666; }
         textarea, input, select { width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; }
-        .btn-del { background: #dc3545; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; }
         .btn-save { background: #28a745; color: white; width: 100%; padding: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; }
         .btn-nova { background: #007bff; color: white; width: 100%; padding: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; display: none; margin-top: 20px; }
         .auth-box { border: 2px dashed #1a365d; padding: 15px; margin-top: 20px; background: #f0f7ff; text-align: center; font-weight: bold; }
@@ -171,24 +184,43 @@
 </head>
 <body>
     <div class="container" id="container-geral">
+        <!-- BUSCA POR DATA DE SERVIÇO E TURNO -->
         <div class="seletor-busca no-print">
-            <strong>DATA INÍCIO:</strong> <input type="date" id="data-busca" style="width: auto;">
-            <select id="hora-busca" style="width: auto;"><option value="06:00">06:00</option><option value="18:00">18:00</option></select>
-            <button onclick="consultarRelatorio()" style="cursor:pointer; padding: 8px 15px; font-weight:bold; background:#ffc107; border:none; border-radius:4px;">BUSCAR</button>
+            <strong>CONSULTAR DATA:</strong> <input type="date" id="data-busca" style="width: auto;">
+            <strong>TURNO:</strong> 
+            <select id="turno-busca" style="width: auto;">
+                <option>06h00 às 18h00</option>
+                <option>18h00 às 06h00</option>
+                <option>06h00 às 06h00</option>
+            </select>
+            <button onclick="consultarRelatorio()" style="cursor:pointer; padding: 8px 15px; font-weight:bold; background:#ffc107; border:none; border-radius:4px;">BUSCAR RELATÓRIO</button>
         </div>
-        <h1>3.BPRv - Passagem de Serviço</h1>
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:15px;">
-            <div><label>Saindo:</label><input type="text" id="pol-sai"></div>
-            <div><label>Entrando:</label><input type="text" id="pol-entra"></div>
-            <div><label>Turno:</label><select id="turno-relatorio"><option>06h00 às 18h00</option><option>18h00 às 06h00</option><option>06h00 às 06h00</option></select></div>
+
+        <h1>3.BPRv - Livro de Passagem de Serviço</h1>
+        
+        <!-- LINHA PRINCIPAL ATUALIZADA -->
+        <div style="display:grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap:10px; margin-bottom: 20px;">
+            <div><label><b>Data do Serviço:</b></label><input type="date" id="data-servico"></div>
+            <div><label>Saindo:</label><input type="text" id="pol-sai" placeholder="RE / Nome"></div>
+            <div><label>Entrando:</label><input type="text" id="pol-entra" placeholder="RE / Nome"></div>
+            <div><label>Turno:</label>
+                <select id="turno-relatorio">
+                    <option>06h00 às 18h00</option>
+                    <option>18h00 às 06h00</option>
+                    <option>06h00 às 06h00</option>
+                </select>
+            </div>
         </div>
+
         <h2>1. PPRI</h2><textarea id="ppri" rows="8"></textarea>
         <h2>2. SICOORDOP</h2><textarea id="sicoordop" rows="5"></textarea>
         <h2>3. VIATURAS E MATERIAIS</h2><div id="lista-materiais"></div>
         <button type="button" class="no-print" onclick="addRow()" style="margin-top:10px; cursor:pointer; padding:8px; background:#1a365d; color:white; border:none; border-radius:4px;">+ Adicionar Viatura</button>
         <h2>4. PROTOCOLO</h2><textarea id="protocolo" rows="5"></textarea>
         <h2>5. LIVRE ATENDENTE</h2><textarea id="livre-atendente" rows="20"></textarea>
+        
         <div id="assinatura-area"></div>
+        
         <button id="btnSalvar" class="btn-save no-print" onclick="salvarRegistro()">ASSINAR E REGISTRAR</button>
         <button id="btnNova" class="btn-nova no-print" onclick="prepararNova()">EFETUAR NOVA PASSAGEM (BASEADA NESTA)</button>
         <button class="no-print" style="width:100%; margin-top:10px; padding:12px; background:#6c757d; color:white; border:none; cursor:pointer; border-radius:6px;" onclick="window.print()">GERAR PDF</button>
