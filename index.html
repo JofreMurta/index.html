@@ -705,14 +705,22 @@ window.consultarRelatorio = async () => {
               legado ? 'info' : 'sucesso');
     };
 
+    // Define janela de busca exata: do início ao fim da hora selecionada
+    // Ex: 06/05/2026 06:00 → busca entre 06:00:00 e 06:59:59 daquele dia
+    const dataInicio = new Date(`${dataPura}T${horaPura}:00`);
+    const dataFim    = new Date(`${dataPura}T${horaPura}:59`);
+    dataFim.setMinutes(dataFim.getMinutes() + 59);
+    dataFim.setSeconds(59);
+
     try {
         let encontrado = false;
 
-        // Tentativa 1: campo novo (dataHoraPassagem)
+        // Tentativa 1: campo novo (dataHoraPassagem) — busca exata na janela da hora
         try {
             const q = query(
                 collection(db, 'passagens'),
-                where('dataHoraPassagem', '<=', dataBusca),
+                where('dataHoraPassagem', '>=', dataInicio),
+                where('dataHoraPassagem', '<=', dataFim),
                 orderBy('dataHoraPassagem', 'desc'),
                 limit(1)
             );
@@ -725,12 +733,13 @@ window.consultarRelatorio = async () => {
             console.warn('Query dataHoraPassagem falhou (índice ausente?):', e1.message);
         }
 
-        // Tentativa 2: campo legado (timestamp)
+        // Tentativa 2: campo legado (timestamp) — busca exata na janela da hora
         if (!encontrado) {
             try {
                 const qLegado = query(
                     collection(db, 'passagens'),
-                    where('timestamp', '<=', dataBusca),
+                    where('timestamp', '>=', dataInicio),
+                    where('timestamp', '<=', dataFim),
                     orderBy('timestamp', 'desc'),
                     limit(1)
                 );
@@ -744,7 +753,7 @@ window.consultarRelatorio = async () => {
             }
         }
 
-        // Nenhuma das queries retornou resultado
+        // Nenhum registro encontrado para a data/hora exata
         if (!encontrado) {
             exibirAvisoNaoEncontrado();
         }
@@ -899,35 +908,52 @@ window.adminBuscarRegistro = async () => {
     if (!dataPura) { toast('Selecione uma data para buscar.', 'erro'); return; }
 
     setCarregando('btn-admin-buscar', true);
-    const dataBusca = new Date(`${dataPura}T${horaPura}:00`);
+
+    // Janela de busca exata na hora selecionada
+    const dataInicio = new Date(`${dataPura}T${horaPura}:00`);
+    const dataFim    = new Date(`${dataPura}T${horaPura}:00`);
+    dataFim.setMinutes(dataFim.getMinutes() + 59);
+    dataFim.setSeconds(59);
 
     try {
-        // Busca no campo novo
-        let docEncontrado = null;
+        let docEncontrado   = null;
         let docIdEncontrado = null;
 
-        const q = query(
-            collection(db, 'passagens'),
-            where('dataHoraPassagem', '<=', dataBusca),
-            orderBy('dataHoraPassagem', 'desc'),
-            limit(1)
-        );
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-            docEncontrado   = snap.docs[0].data();
-            docIdEncontrado = snap.docs[0].id;
-        } else {
-            // Fallback legado
-            const qL = query(
+        // Busca no campo novo — janela exata
+        try {
+            const q = query(
                 collection(db, 'passagens'),
-                where('timestamp', '<=', dataBusca),
-                orderBy('timestamp', 'desc'),
+                where('dataHoraPassagem', '>=', dataInicio),
+                where('dataHoraPassagem', '<=', dataFim),
+                orderBy('dataHoraPassagem', 'desc'),
                 limit(1)
             );
-            const snapL = await getDocs(qL);
-            if (!snapL.empty) {
-                docEncontrado   = snapL.docs[0].data();
-                docIdEncontrado = snapL.docs[0].id;
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                docEncontrado   = snap.docs[0].data();
+                docIdEncontrado = snap.docs[0].id;
+            }
+        } catch (e1) {
+            console.warn('Admin query dataHoraPassagem falhou:', e1.message);
+        }
+
+        // Fallback legado — janela exata
+        if (!docEncontrado) {
+            try {
+                const qL = query(
+                    collection(db, 'passagens'),
+                    where('timestamp', '>=', dataInicio),
+                    where('timestamp', '<=', dataFim),
+                    orderBy('timestamp', 'desc'),
+                    limit(1)
+                );
+                const snapL = await getDocs(qL);
+                if (!snapL.empty) {
+                    docEncontrado   = snapL.docs[0].data();
+                    docIdEncontrado = snapL.docs[0].id;
+                }
+            } catch (e2) {
+                console.warn('Admin query timestamp falhou:', e2.message);
             }
         }
 
