@@ -172,6 +172,11 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* ── CAMPOS DE DATA SEM VALOR ── */
+        input[type="date"]:not([value])::-webkit-datetime-edit { color: transparent; }
+        input[type="date"]:focus::-webkit-datetime-edit { color: #000; }
+        input[type="date"].com-valor::-webkit-datetime-edit { color: #000; }
+
         /* ── IMPRESSÃO ── */
         .print-only { display: none; }
         @media print {
@@ -344,7 +349,8 @@
         </label>
         <div style="display:flex; gap:8px; margin-bottom:12px;">
             <input type="date" id="admin-data-busca"
-                   style="flex:1; padding:9px; border:1px solid #ced4da; border-radius:6px;">
+                   style="flex:1; padding:9px; border:1px solid #ced4da; border-radius:6px;"
+                   placeholder="dd/mm/aaaa">
             <select id="admin-hora-busca"
                     style="padding:9px; border:1px solid #ced4da; border-radius:6px;">
                 <option value="06:00">06:00</option>
@@ -368,8 +374,9 @@
             </label>
             <div style="display:flex; gap:8px; margin-bottom:16px;">
                 <input type="date" id="admin-nova-data"
-                       style="flex:1; padding:9px; border:1px solid #28a745;
-                              border-radius:6px; border-width:2px;">
+                       style="flex:1; padding:9px; border:2px solid #28a745;
+                              border-radius:6px;"
+                       placeholder="dd/mm/aaaa">
                 <select id="admin-nova-hora"
                         style="padding:9px; border:2px solid #28a745; border-radius:6px;">
                     <option value="06:00">06:00</option>
@@ -593,6 +600,17 @@ function iniciarApp() {
             .addEventListener('input', saveDraftDebounced);
 }
 
+// Aplicar classe nos campos de data ao selecionar valor
+document.querySelectorAll('input[type="date"]').forEach(campo => {
+    campo.addEventListener('change', () => {
+        if (campo.value) {
+            campo.classList.add('com-valor');
+        } else {
+            campo.classList.remove('com-valor');
+        }
+    });
+});
+
 // ── Adicionar linha de viatura ─────────────────────────────────────────────
 window.addRow = (nome = '', pol = '', obs = '') => {
     const container = document.getElementById('lista-materiais');
@@ -667,51 +685,73 @@ window.consultarRelatorio = async () => {
     const dataBusca = new Date(`${dataPura}T${horaPura}:00`);
     setCarregando('btn-buscar', true);
 
-    try {
-        const q = query(
-            collection(db, 'passagens'),
-            where('dataHoraPassagem', '<=', dataBusca),
-            orderBy('dataHoraPassagem', 'desc'),
-            limit(1)
-        );
-        const snap = await getDocs(q);
+    // Função auxiliar para exibir aviso de não encontrado
+    const exibirAvisoNaoEncontrado = () => {
+        const dataFormatada = new Date(`${dataPura}T${horaPura}:00`).toLocaleString('pt-BR', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+        const avisoEl = document.getElementById('aviso-nao-cadastrado');
+        avisoEl.textContent = `⚠️ Nenhuma passagem de serviço cadastrada para ${dataFormatada}. Verifique a data e horário informados ou registre uma nova passagem.`;
+        avisoEl.style.display = 'block';
+    };
 
-        if (!snap.empty) {
-            const reg = snap.docs[0].data();
-            preencherCampos(reg, true);
-            document.getElementById('assinatura-area').innerHTML =
-                `<div class="auth-box">Relatório Oficial — Assinado por: ${reg.assinatura}</div>`;
-            document.getElementById('aviso-nao-cadastrado').style.display = 'none';
-            toast('Registro encontrado e carregado.', 'sucesso');
-        } else {
-            // Fallback: busca pelo campo legado "timestamp" (registros antigos)
-            const qLegado = query(
+    // Função auxiliar para carregar registro encontrado
+    const carregarRegistro = (reg, legado = false) => {
+        preencherCampos(reg, true);
+        document.getElementById('assinatura-area').innerHTML =
+            `<div class="auth-box">Relatório Oficial — Assinado por: ${reg.assinatura}</div>`;
+        document.getElementById('aviso-nao-cadastrado').style.display = 'none';
+        toast(legado ? 'Registro encontrado (formato legado).' : 'Registro encontrado e carregado.',
+              legado ? 'info' : 'sucesso');
+    };
+
+    try {
+        let encontrado = false;
+
+        // Tentativa 1: campo novo (dataHoraPassagem)
+        try {
+            const q = query(
                 collection(db, 'passagens'),
-                where('timestamp', '<=', dataBusca),
-                orderBy('timestamp', 'desc'),
+                where('dataHoraPassagem', '<=', dataBusca),
+                orderBy('dataHoraPassagem', 'desc'),
                 limit(1)
             );
-            const snapLegado = await getDocs(qLegado);
-            if (!snapLegado.empty) {
-                const reg = snapLegado.docs[0].data();
-                preencherCampos(reg, true);
-                document.getElementById('assinatura-area').innerHTML =
-                    `<div class="auth-box">Relatório Oficial — Assinado por: ${reg.assinatura}</div>`;
-                document.getElementById('aviso-nao-cadastrado').style.display = 'none';
-                toast('Registro encontrado (formato legado).', 'info');
-            } else {
-                // Exibir mensagem em vermelho na tela com data/hora consultada
-                const dataFormatada = new Date(`${dataPura}T${horaPura}:00`).toLocaleString('pt-BR', {
-                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                });
-                const avisoEl = document.getElementById('aviso-nao-cadastrado');
-                avisoEl.textContent = `⚠️ Nenhuma passagem de serviço cadastrada para ${dataFormatada}. Verifique a data e horário informados ou registre uma nova passagem.`;
-                avisoEl.style.display = 'block';
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                carregarRegistro(snap.docs[0].data(), false);
+                encontrado = true;
+            }
+        } catch (e1) {
+            console.warn('Query dataHoraPassagem falhou (índice ausente?):', e1.message);
+        }
+
+        // Tentativa 2: campo legado (timestamp)
+        if (!encontrado) {
+            try {
+                const qLegado = query(
+                    collection(db, 'passagens'),
+                    where('timestamp', '<=', dataBusca),
+                    orderBy('timestamp', 'desc'),
+                    limit(1)
+                );
+                const snapLegado = await getDocs(qLegado);
+                if (!snapLegado.empty) {
+                    carregarRegistro(snapLegado.docs[0].data(), true);
+                    encontrado = true;
+                }
+            } catch (e2) {
+                console.warn('Query timestamp falhou:', e2.message);
             }
         }
+
+        // Nenhuma das queries retornou resultado
+        if (!encontrado) {
+            exibirAvisoNaoEncontrado();
+        }
+
     } catch (e) {
-        console.error('Erro ao consultar:', e);
-        toast('Erro ao buscar registro. Verifique a conexão.', 'erro');
+        console.error('Erro geral ao consultar:', e);
+        exibirAvisoNaoEncontrado();
     } finally {
         setCarregando('btn-buscar', false);
     }
@@ -842,6 +882,7 @@ window.abrirPainelAdmin = () => {
     document.getElementById('admin-resultado').style.display   = 'none';
     document.getElementById('btn-admin-salvar').style.display  = 'none';
     document.getElementById('admin-data-busca').value          = '';
+    document.getElementById('admin-nova-data').value            = '';
     document.getElementById('admin-info-registro').textContent = '';
     document.getElementById('modal-admin').classList.add('ativo');
 };
