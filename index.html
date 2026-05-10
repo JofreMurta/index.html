@@ -505,8 +505,6 @@ const loadDraft = () => {
 
 // ── Inicialização do app ───────────────────────────────────────────────────
 function iniciarApp() {
-    const hoje = new Date().toISOString().split('T')[0];
-    document.getElementById('data-busca').value = hoje;
     loadDraft();
     document.getElementById('container-geral')
             .addEventListener('input', saveDraftDebounced);
