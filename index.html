@@ -595,9 +595,59 @@ const loadDraft = () => {
 
 // ── Inicialização do app ───────────────────────────────────────────────────
 function iniciarApp() {
-    loadDraft();
     document.getElementById('container-geral')
             .addEventListener('input', saveDraftDebounced);
+    // Carrega automaticamente o último relatório cadastrado (modo leitura)
+    carregarUltimoRelatorio();
+}
+
+// ── Carregar último relatório cadastrado ───────────────────────────────────
+async function carregarUltimoRelatorio() {
+    try {
+        let reg = null;
+
+        // Tentativa 1: campo novo (dataHoraPassagem) — registro mais recente
+        try {
+            const q = query(
+                collection(db, 'passagens'),
+                orderBy('dataHoraPassagem', 'desc'),
+                limit(1)
+            );
+            const snap = await getDocs(q);
+            if (!snap.empty) reg = snap.docs[0].data();
+        } catch (e1) {
+            console.warn('Busca último (dataHoraPassagem) falhou:', e1.message);
+        }
+
+        // Tentativa 2: campo legado (timestamp) — registro mais recente
+        if (!reg) {
+            try {
+                const qL = query(
+                    collection(db, 'passagens'),
+                    orderBy('timestamp', 'desc'),
+                    limit(1)
+                );
+                const snapL = await getDocs(qL);
+                if (!snapL.empty) reg = snapL.docs[0].data();
+            } catch (e2) {
+                console.warn('Busca último (timestamp) falhou:', e2.message);
+            }
+        }
+
+        if (reg) {
+            // Exibe o último relatório bloqueado, com botão de nova passagem
+            preencherCampos(reg, true);
+            document.getElementById('assinatura-area').innerHTML =
+                `<div class="auth-box">Último relatório registrado — Assinado por: ${reg.assinatura}</div>`;
+            toast('Último relatório carregado. Clique em "Efetuar Nova Passagem" para iniciar uma nova.', 'info', 6000);
+        } else {
+            // Não há registros — restaura rascunho se houver
+            loadDraft();
+        }
+    } catch (e) {
+        console.error('Erro ao carregar último relatório:', e);
+        loadDraft();
+    }
 }
 
 // Aplicar classe nos campos de data ao selecionar valor
@@ -796,7 +846,14 @@ window.prepararNova = () => {
     document.getElementById('btnSalvar').style.display = 'block';
     document.getElementById('btnNova').style.display   = 'none';
     document.getElementById('assinatura-area').innerHTML = '';
+    // Limpa a data para o operador selecionar a nova data da passagem manualmente
+    const dataEl = document.getElementById('data-busca');
+    dataEl.value = '';
+    dataEl.classList.remove('com-valor');
+    // Limpa aviso de não cadastrado, se houver
+    document.getElementById('aviso-nao-cadastrado').style.display = 'none';
     saveDraft();
+    toast('Campos liberados. Selecione a data da nova passagem e edite o conteúdo.', 'info', 5000);
 };
 
 // ── Modal de assinatura ────────────────────────────────────────────────────
