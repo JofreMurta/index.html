@@ -323,6 +323,10 @@
         </button>
         <button class="btn-pdf no-print" onclick="window.print()">GERAR PDF</button>
 
+        <div class="no-print" style="text-align:center; margin-top:15px; font-size:11px; color:#999;">
+            Sistema 3.BPRv — versão 2.4 (correção de campos do painel admin)
+        </div>
+
     </div><!-- /container -->
 </div><!-- /app -->
 
@@ -655,7 +659,25 @@ async function carregarUltimoRelatorio() {
     } catch (e) {
         console.error('Erro ao carregar último relatório:', e);
         loadDraft();
+    } finally {
+        // GARANTIA: campos de busca e do painel admin NUNCA devem ficar bloqueados
+        garantirCamposLiberados();
     }
+}
+
+// ── Garantia de campos sempre liberados (busca principal + painel admin) ────
+function garantirCamposLiberados() {
+    ['data-busca', 'hora-busca',
+     'admin-data-busca', 'admin-hora-busca',
+     'admin-nova-data', 'admin-nova-hora'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.readOnly = false;
+            el.disabled = false;
+            el.removeAttribute('readonly');
+            el.removeAttribute('disabled');
+        }
+    });
 }
 
 // ── Adicionar linha de viatura ─────────────────────────────────────────────
@@ -966,6 +988,8 @@ window.abrirPainelAdmin = () => {
     document.getElementById('admin-data-busca').value          = '';
     document.getElementById('admin-nova-data').value            = '';
     document.getElementById('admin-info-registro').textContent = '';
+    // GARANTIA: campos do painel sempre liberados ao abrir
+    garantirCamposLiberados();
     document.getElementById('modal-admin').classList.add('ativo');
 };
 
