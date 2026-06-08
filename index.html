@@ -172,11 +172,6 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ── CAMPOS DE DATA SEM VALOR ── */
-        input[type="date"]:not([value])::-webkit-datetime-edit { color: transparent; }
-        input[type="date"]:focus::-webkit-datetime-edit { color: #000; }
-        input[type="date"].com-valor::-webkit-datetime-edit { color: #000; }
-
         /* ── IMPRESSÃO ── */
         .print-only { display: none; }
         @media print {
@@ -650,17 +645,6 @@ async function carregarUltimoRelatorio() {
     }
 }
 
-// Aplicar classe nos campos de data ao selecionar valor
-document.querySelectorAll('input[type="date"]').forEach(campo => {
-    campo.addEventListener('change', () => {
-        if (campo.value) {
-            campo.classList.add('com-valor');
-        } else {
-            campo.classList.remove('com-valor');
-        }
-    });
-});
-
 // ── Adicionar linha de viatura ─────────────────────────────────────────────
 window.addRow = (nome = '', pol = '', obs = '') => {
     const container = document.getElementById('lista-materiais');
@@ -849,7 +833,6 @@ window.prepararNova = () => {
     // Limpa a data para o operador selecionar a nova data da passagem manualmente
     const dataEl = document.getElementById('data-busca');
     dataEl.value = '';
-    dataEl.classList.remove('com-valor');
     // Limpa aviso de não cadastrado, se houver
     document.getElementById('aviso-nao-cadastrado').style.display = 'none';
     saveDraft();
@@ -964,9 +947,7 @@ window.abrirPainelAdmin = () => {
 
     document.getElementById('admin-resultado').style.display   = 'none';
     document.getElementById('admin-data-busca').value          = '';
-    document.getElementById('admin-data-busca').classList.remove('com-valor');
     document.getElementById('admin-nova-data').value            = '';
-    document.getElementById('admin-nova-data').classList.remove('com-valor');
     document.getElementById('admin-info-registro').textContent = '';
     document.getElementById('modal-admin').classList.add('ativo');
 };
