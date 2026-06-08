@@ -945,10 +945,28 @@ let adminDocId = null; // ID do documento Firestore localizado
 window.abrirPainelAdmin = () => {
     if (!isAdmin()) { toast('Acesso restrito ao administrador.', 'erro'); return; }
     adminDocId = null;
+
+    // Reset completo do estado do painel (evita travamento após retificação anterior)
+    const btnSalvar = document.getElementById('btn-admin-salvar');
+    btnSalvar.style.display = 'none';
+    btnSalvar.disabled = false;
+    if (btnSalvar.dataset.textoOriginal) {
+        btnSalvar.innerHTML = btnSalvar.dataset.textoOriginal;
+        delete btnSalvar.dataset.textoOriginal;
+    }
+
+    const btnBuscar = document.getElementById('btn-admin-buscar');
+    btnBuscar.disabled = false;
+    if (btnBuscar.dataset.textoOriginal) {
+        btnBuscar.innerHTML = btnBuscar.dataset.textoOriginal;
+        delete btnBuscar.dataset.textoOriginal;
+    }
+
     document.getElementById('admin-resultado').style.display   = 'none';
-    document.getElementById('btn-admin-salvar').style.display  = 'none';
     document.getElementById('admin-data-busca').value          = '';
+    document.getElementById('admin-data-busca').classList.remove('com-valor');
     document.getElementById('admin-nova-data').value            = '';
+    document.getElementById('admin-nova-data').classList.remove('com-valor');
     document.getElementById('admin-info-registro').textContent = '';
     document.getElementById('modal-admin').classList.add('ativo');
 };
@@ -1078,12 +1096,13 @@ window.adminSalvarData = async () => {
             corrigidoPor:  auth.currentUser.email,
             corrigidoEm:   serverTimestamp(),
         });
+        // Restaura o botão ANTES de fechar o modal (evita travamento na próxima abertura)
+        setCarregando('btn-admin-salvar', false);
         toast(`Data corrigida com sucesso para ${novaDataStr}.`, 'sucesso', 6000);
         fecharModalAdmin();
     } catch (e) {
         console.error('Erro admin salvar:', e);
         toast('Erro ao salvar correção. Verifique a conexão.', 'erro');
-    } finally {
         setCarregando('btn-admin-salvar', false);
     }
 };
