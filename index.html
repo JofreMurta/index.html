@@ -825,11 +825,14 @@ function preencherCampos(reg, bloquear) {
     document.getElementById('lista-materiais').innerHTML = '';
     if (reg.itens) reg.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
 
-    document.querySelectorAll('input, textarea, select').forEach(el => {
-        if (el.id !== 'data-busca' && el.id !== 'hora-busca') {
-            el.readOnly = bloquear;
-            if (el.tagName === 'SELECT') el.disabled = bloquear;
-        }
+    // Bloqueia apenas os campos do formulário de passagem.
+    // Exclui campos da busca principal e TODOS os campos dentro de modais
+    // (assinatura e painel admin), que nunca devem ser bloqueados.
+    document.querySelectorAll('#container-geral input, #container-geral textarea, #container-geral select').forEach(el => {
+        if (el.id === 'data-busca' || el.id === 'hora-busca') return;
+        if (el.closest('.modal-overlay')) return; // ignora campos de modais
+        el.readOnly = bloquear;
+        if (el.tagName === 'SELECT') el.disabled = bloquear;
     });
     document.getElementById('btnSalvar').style.display = bloquear ? 'none'  : 'block';
     document.getElementById('btnNova').style.display   = bloquear ? 'block' : 'none';
@@ -837,7 +840,8 @@ function preencherCampos(reg, bloquear) {
 
 // ── Preparar nova passagem ─────────────────────────────────────────────────
 window.prepararNova = () => {
-    document.querySelectorAll('input, textarea, select').forEach(el => {
+    document.querySelectorAll('#container-geral input, #container-geral textarea, #container-geral select').forEach(el => {
+        if (el.closest('.modal-overlay')) return; // ignora campos de modais
         el.readOnly = false; el.disabled = false;
     });
     document.getElementById('btnSalvar').style.display = 'block';
