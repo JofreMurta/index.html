@@ -82,17 +82,6 @@
             background: #f8f9fa; color: #555; cursor: default;
         }
 
-        .input-group-vtr {
-            display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px;
-            background: #f8f9fa; padding: 10px; border-radius: 6px;
-        }
-        .field-vtr { display: flex; flex-direction: column; flex: 1; }
-        .field-vtr label { font-size: 11px; font-weight: bold; color: #666; margin-bottom: 3px; }
-        .btn-del {
-            background: #dc3545; color: white; border: none;
-            padding: 10px 14px; border-radius: 4px; cursor: pointer; white-space: nowrap;
-        }
-
         /* ── BOTÕES DE AÇÃO ── */
         .btn-save {
             background: #28a745; color: white; width: 100%; padding: 18px;
@@ -112,11 +101,6 @@
             cursor: pointer; border-radius: 6px; font-size: 14px;
         }
         .btn-pdf:hover { background: #5a6268; }
-        .btn-add {
-            margin-top: 10px; cursor: pointer; padding: 8px 16px;
-            background: #1a365d; color: white; border: none;
-            border-radius: 4px; font-size: 14px;
-        }
 
         /* ── ASSINATURA ── */
         .auth-box {
@@ -288,14 +272,25 @@
         <h2>2. SICOORDOP</h2>
         <textarea id="sicoordop" rows="5"></textarea>
 
-        <h2>3. VIATURAS E MATERIAIS</h2>
-        <div id="lista-materiais"></div>
-        <button type="button" class="btn-add no-print" onclick="addRow()">+ Adicionar Viatura</button>
+        <h2>3. MENSAGENS</h2>
+        <textarea id="mensagens" rows="5"></textarea>
 
         <h2>4. PROTOCOLO</h2>
         <textarea id="protocolo" rows="5"></textarea>
 
-        <h2>5. LIVRE ATENDENTE</h2>
+        <h2>5. VIATURAS</h2>
+        <textarea id="viaturas" rows="5"></textarea>
+
+        <h2>6. MATERIAIS</h2>
+        <textarea id="materiais" rows="5"></textarea>
+
+        <h2>7. ARMAS</h2>
+        <textarea id="armas" rows="5"></textarea>
+
+        <h2>8. OPERAÇÕES</h2>
+        <textarea id="operacoes" rows="5"></textarea>
+
+        <h2>9. LIVRE ATENDENTE</h2>
         <textarea id="livre-atendente" rows="20"></textarea>
 
         <div id="assinatura-area"></div>
@@ -549,13 +544,13 @@ const saveDraft = () => {
         turno:          document.getElementById('turno-relatorio').value,
         ppri:           document.getElementById('ppri').value,
         sicoordop:      document.getElementById('sicoordop').value,
+        mensagens:      document.getElementById('mensagens').value,
         protocolo:      document.getElementById('protocolo').value,
-        livreAtendente: document.getElementById('livre-atendente').value,
-        itens: Array.from(document.querySelectorAll('.row-item')).map(row => ({
-            nome: row.querySelector('.nome-item').value,
-            pol:  row.querySelector('.pol-item').value,
-            obs:  row.querySelector('.obs-item').value
-        }))
+        viaturas:       document.getElementById('viaturas').value,
+        materiais:      document.getElementById('materiais').value,
+        armas:          document.getElementById('armas').value,
+        operacoes:      document.getElementById('operacoes').value,
+        livreAtendente: document.getElementById('livre-atendente').value
     };
     localStorage.setItem(CHAVE_RASCUNHO, JSON.stringify(draft));
 };
@@ -577,10 +572,13 @@ const loadDraft = () => {
         document.getElementById('turno-relatorio').value    = draft.turno          || '06h00 às 18h00';
         document.getElementById('ppri').value               = draft.ppri           || '';
         document.getElementById('sicoordop').value          = draft.sicoordop      || '';
+        document.getElementById('mensagens').value          = draft.mensagens      || '';
         document.getElementById('protocolo').value          = draft.protocolo      || '';
+        document.getElementById('viaturas').value           = draft.viaturas       || '';
+        document.getElementById('materiais').value          = draft.materiais      || '';
+        document.getElementById('armas').value              = draft.armas          || '';
+        document.getElementById('operacoes').value          = draft.operacoes      || '';
         document.getElementById('livre-atendente').value    = draft.livreAtendente || '';
-        document.getElementById('lista-materiais').innerHTML = '';
-        if (draft.itens) draft.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
     } catch {
         localStorage.removeItem(CHAVE_RASCUNHO);
     }
@@ -642,65 +640,6 @@ async function carregarUltimoRelatorio() {
         loadDraft();
     }
 }
-
-// ── Adicionar linha de viatura ─────────────────────────────────────────────
-window.addRow = (nome = '', pol = '', obs = '') => {
-    const container = document.getElementById('lista-materiais');
-    const div       = document.createElement('div');
-    div.className   = 'row-item';
-
-    // Inputs criados via DOM (evita XSS por interpolação)
-    const inputNome = document.createElement('input');
-    inputNome.type  = 'text'; inputNome.className = 'nome-item'; inputNome.value = nome;
-
-    const inputPol  = document.createElement('input');
-    inputPol.type   = 'text'; inputPol.className = 'pol-item';  inputPol.value = pol;
-
-    const inputObs  = document.createElement('input');
-    inputObs.type   = 'text'; inputObs.className = 'obs-item';  inputObs.value = obs;
-
-    const btnDel    = document.createElement('button');
-    btnDel.type     = 'button'; btnDel.className = 'btn-del';
-    btnDel.textContent = 'X';
-    btnDel.addEventListener('click', () => { div.remove(); saveDraft(); });
-
-    // Grupo visível (sem impressão)
-    const grupo = document.createElement('div');
-    grupo.className = 'no-print input-group-vtr';
-
-    const fNome = document.createElement('div'); fNome.className = 'field-vtr';
-    const lNome = document.createElement('label'); lNome.textContent = 'Item/Vtr:';
-    fNome.appendChild(lNome); fNome.appendChild(inputNome);
-
-    const fPol  = document.createElement('div'); fPol.className = 'field-vtr';
-    const lPol  = document.createElement('label'); lPol.textContent = 'Responsável:';
-    fPol.appendChild(lPol); fPol.appendChild(inputPol);
-
-    const fObs  = document.createElement('div'); fObs.className = 'field-vtr';
-    const lObs  = document.createElement('label'); lObs.textContent = 'Observações:';
-    fObs.appendChild(lObs); fObs.appendChild(inputObs);
-
-    grupo.appendChild(fNome); grupo.appendChild(fPol);
-    grupo.appendChild(fObs);  grupo.appendChild(btnDel);
-
-    // Linha de impressão
-    const printSpan = document.createElement('span');
-    printSpan.className = 'print-only print-line';
-
-    const atualizarPrintSpan = () => {
-        printSpan.textContent =
-            `${inputNome.value} | ${inputPol.value}${inputObs.value ? ' | ' + inputObs.value : ''}`;
-    };
-    [inputNome, inputPol, inputObs].forEach(el => {
-        el.addEventListener('input', () => { atualizarPrintSpan(); saveDraftDebounced(); });
-    });
-    atualizarPrintSpan();
-
-    div.appendChild(grupo);
-    div.appendChild(printSpan);
-    container.appendChild(div);
-    saveDraft();
-};
 
 // ── Consultar relatório ────────────────────────────────────────────────────
 window.consultarRelatorio = async () => {
@@ -805,27 +744,40 @@ function preencherCampos(reg, bloquear) {
     document.getElementById('turno-relatorio').value    = reg.turno          || '06h00 às 18h00';
     document.getElementById('ppri').value               = reg.ppri           || '';
     document.getElementById('sicoordop').value          = reg.sicoordop      || '';
+    document.getElementById('mensagens').value          = reg.mensagens      || '';
     document.getElementById('protocolo').value          = reg.protocolo      || '';
+    document.getElementById('materiais').value          = reg.materiais      || '';
+    document.getElementById('armas').value              = reg.armas          || '';
+    document.getElementById('operacoes').value          = reg.operacoes      || '';
     document.getElementById('livre-atendente').value    = reg.livreAtendente || '';
-    document.getElementById('lista-materiais').innerHTML = '';
-    if (reg.itens) reg.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
+
+    // Campo VIATURAS: usa o novo campo; se ausente, converte o histórico antigo
+    // (estrutura itens: Item/Responsável/Obs) para texto, preservando o histórico.
+    if (reg.viaturas) {
+        document.getElementById('viaturas').value = reg.viaturas;
+    } else if (reg.itens && reg.itens.length > 0) {
+        const textoViaturas = reg.itens.map(i => {
+            const partes = [i.nome, i.pol, i.obs].filter(p => p && p.trim());
+            return partes.join(' | ');
+        }).filter(linha => linha.trim()).join('\n');
+        document.getElementById('viaturas').value = textoViaturas;
+    } else {
+        document.getElementById('viaturas').value = '';
+    }
 
     // Bloqueia/desbloqueia APENAS os campos do formulário de passagem.
     // Os campos de busca (data-busca, hora-busca) e do painel admin ficam
     // sempre livres — mesmo tratamento dado ao campo DATA INÍCIO.
     const camposFormulario = [
         'pol-sai', 'pol-entra', 'turno-relatorio',
-        'ppri', 'sicoordop', 'protocolo', 'livre-atendente'
+        'ppri', 'sicoordop', 'mensagens', 'protocolo',
+        'viaturas', 'materiais', 'armas', 'operacoes', 'livre-atendente'
     ];
     camposFormulario.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         el.readOnly = bloquear;
         if (el.tagName === 'SELECT') el.disabled = bloquear;
-    });
-    // Campos das viaturas (gerados dinamicamente) dentro da lista de materiais
-    document.querySelectorAll('#lista-materiais input').forEach(el => {
-        el.readOnly = bloquear;
     });
     document.getElementById('btnSalvar').style.display = bloquear ? 'none'  : 'block';
     document.getElementById('btnNova').style.display   = bloquear ? 'block' : 'none';
@@ -836,16 +788,14 @@ window.prepararNova = () => {
     // Libera apenas os campos do formulário de passagem
     const camposFormulario = [
         'pol-sai', 'pol-entra', 'turno-relatorio',
-        'ppri', 'sicoordop', 'protocolo', 'livre-atendente'
+        'ppri', 'sicoordop', 'mensagens', 'protocolo',
+        'viaturas', 'materiais', 'armas', 'operacoes', 'livre-atendente'
     ];
     camposFormulario.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         el.readOnly = false;
         el.disabled = false;
-    });
-    document.querySelectorAll('#lista-materiais input').forEach(el => {
-        el.readOnly = false;
     });
     document.getElementById('btnSalvar').style.display = 'block';
     document.getElementById('btnNova').style.display   = 'none';
@@ -917,14 +867,14 @@ window.salvarRegistro = async () => {
         turno:            document.getElementById('turno-relatorio').value,
         ppri:             document.getElementById('ppri').value,
         sicoordop:        document.getElementById('sicoordop').value,
+        mensagens:        document.getElementById('mensagens').value,
         protocolo:        document.getElementById('protocolo').value,
+        viaturas:         document.getElementById('viaturas').value,
+        materiais:        document.getElementById('materiais').value,
+        armas:            document.getElementById('armas').value,
+        operacoes:        document.getElementById('operacoes').value,
         livreAtendente:   document.getElementById('livre-atendente').value,
-        assinatura:       `${nomeConfirm} (${usuario.email}) em ${new Date().toLocaleString('pt-BR')}`,
-        itens: Array.from(document.querySelectorAll('.row-item')).map(row => ({
-            nome: row.querySelector('.nome-item').value,
-            pol:  row.querySelector('.pol-item').value,
-            obs:  row.querySelector('.obs-item').value
-        }))
+        assinatura:       `${nomeConfirm} (${usuario.email}) em ${new Date().toLocaleString('pt-BR')}`
     };
 
     try {
