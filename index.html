@@ -344,8 +344,7 @@
         </label>
         <div style="display:flex; gap:8px; margin-bottom:12px;">
             <input type="date" id="admin-data-busca"
-                   style="flex:1; padding:9px; border:1px solid #ced4da; border-radius:6px;"
-                   placeholder="dd/mm/aaaa">
+                   style="flex:1; padding:9px; border:1px solid #ced4da; border-radius:6px;">
             <select id="admin-hora-busca"
                     style="padding:9px; border:1px solid #ced4da; border-radius:6px;">
                 <option value="06:00">06:00</option>
@@ -370,8 +369,7 @@
             <div style="display:flex; gap:8px; margin-bottom:16px;">
                 <input type="date" id="admin-nova-data"
                        style="flex:1; padding:9px; border:2px solid #28a745;
-                              border-radius:6px;"
-                       placeholder="dd/mm/aaaa">
+                              border-radius:6px;">
                 <select id="admin-nova-hora"
                         style="padding:9px; border:2px solid #28a745; border-radius:6px;">
                     <option value="06:00">06:00</option>
@@ -812,11 +810,22 @@ function preencherCampos(reg, bloquear) {
     document.getElementById('lista-materiais').innerHTML = '';
     if (reg.itens) reg.itens.forEach(i => addRow(i.nome, i.pol, i.obs));
 
-    document.querySelectorAll('input, textarea, select').forEach(el => {
-        if (el.id !== 'data-busca' && el.id !== 'hora-busca') {
-            el.readOnly = bloquear;
-            if (el.tagName === 'SELECT') el.disabled = bloquear;
-        }
+    // Bloqueia/desbloqueia APENAS os campos do formulário de passagem.
+    // Os campos de busca (data-busca, hora-busca) e do painel admin ficam
+    // sempre livres — mesmo tratamento dado ao campo DATA INÍCIO.
+    const camposFormulario = [
+        'pol-sai', 'pol-entra', 'turno-relatorio',
+        'ppri', 'sicoordop', 'protocolo', 'livre-atendente'
+    ];
+    camposFormulario.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.readOnly = bloquear;
+        if (el.tagName === 'SELECT') el.disabled = bloquear;
+    });
+    // Campos das viaturas (gerados dinamicamente) dentro da lista de materiais
+    document.querySelectorAll('#lista-materiais input').forEach(el => {
+        el.readOnly = bloquear;
     });
     document.getElementById('btnSalvar').style.display = bloquear ? 'none'  : 'block';
     document.getElementById('btnNova').style.display   = bloquear ? 'block' : 'none';
@@ -824,8 +833,19 @@ function preencherCampos(reg, bloquear) {
 
 // ── Preparar nova passagem ─────────────────────────────────────────────────
 window.prepararNova = () => {
-    document.querySelectorAll('input, textarea, select').forEach(el => {
-        el.readOnly = false; el.disabled = false;
+    // Libera apenas os campos do formulário de passagem
+    const camposFormulario = [
+        'pol-sai', 'pol-entra', 'turno-relatorio',
+        'ppri', 'sicoordop', 'protocolo', 'livre-atendente'
+    ];
+    camposFormulario.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.readOnly = false;
+        el.disabled = false;
+    });
+    document.querySelectorAll('#lista-materiais input').forEach(el => {
+        el.readOnly = false;
     });
     document.getElementById('btnSalvar').style.display = 'block';
     document.getElementById('btnNova').style.display   = 'none';
