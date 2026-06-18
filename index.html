@@ -254,6 +254,8 @@
 
         <h1>3.BPRv - Livro de Passagem de Serviço</h1>
 
+        <div class="print-only" id="print-data-hora" style="text-align:center; margin-bottom:15px; font-size:14px; font-weight:bold; color:#1a365d;"></div>
+
         <div class="grid-3">
             <div><label>Saindo:</label><input type="text" id="pol-sai"></div>
             <div><label>Entrando:</label><input type="text" id="pol-entra"></div>
@@ -1077,6 +1079,39 @@ document.getElementById('input-assinatura')
 // Enter nos campos de login
 document.getElementById('login-senha')
         .addEventListener('keydown', e => { if (e.key === 'Enter') window.fazerLogin(); });
+
+// ── Preencher Data Início e Horário na impressão ───────────────────────────
+const TITULO_ORIGINAL = document.title;
+
+window.addEventListener('beforeprint', () => {
+    const dataPura = document.getElementById('data-busca').value;
+    const horaPura = document.getElementById('hora-busca').value;
+    const el = document.getElementById('print-data-hora');
+
+    if (dataPura) {
+        // Converte AAAA-MM-DD para DD/MM/AAAA
+        const partes = dataPura.split('-');
+        const dataFormatada = partes.length === 3
+            ? `${partes[2]}/${partes[1]}/${partes[0]}`
+            : dataPura;
+        el.textContent = `Data Início: ${dataFormatada}   |   Horário: ${horaPura || ''}`;
+
+        // Define o nome do arquivo PDF (DD-MM-AAAA para evitar barras no nome)
+        const dataArquivo = partes.length === 3
+            ? `${partes[2]}-${partes[1]}-${partes[0]}`
+            : dataPura;
+        const horaArquivo = (horaPura || '').replace(':', 'h');
+        document.title = `3.BPRv - Livro de Passagem ${dataArquivo}${horaArquivo ? ' ' + horaArquivo : ''}`;
+    } else {
+        el.textContent = '';
+        document.title = TITULO_ORIGINAL;
+    }
+});
+
+// Restaura o título original após a impressão
+window.addEventListener('afterprint', () => {
+    document.title = TITULO_ORIGINAL;
+});
 </script>
 
 </body>
